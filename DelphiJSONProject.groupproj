@@ -7,7 +7,7 @@
             <Dependencies/>
         </Projects>
         <Projects Include="Tests\DelphiJSONTests.dproj">
-            <Dependencies/>
+            <Dependencies>DelphiJSON.dproj</Dependencies>
         </Projects>
     </ItemGroup>
     <ProjectExtensions>
@@ -26,13 +26,13 @@
     <Target Name="DelphiJSON:Make">
         <MSBuild Projects="DelphiJSON.dproj" Targets="Make"/>
     </Target>
-    <Target Name="DelphiJSONTests">
+    <Target Name="DelphiJSONTests" DependsOnTargets="DelphiJSON">
         <MSBuild Projects="Tests\DelphiJSONTests.dproj"/>
     </Target>
-    <Target Name="DelphiJSONTests:Clean">
+    <Target Name="DelphiJSONTests:Clean" DependsOnTargets="DelphiJSON:Clean">
         <MSBuild Projects="Tests\DelphiJSONTests.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="DelphiJSONTests:Make">
+    <Target Name="DelphiJSONTests:Make" DependsOnTargets="DelphiJSON:Make">
         <MSBuild Projects="Tests\DelphiJSONTests.dproj" Targets="Make"/>
     </Target>
     <Target Name="Build">

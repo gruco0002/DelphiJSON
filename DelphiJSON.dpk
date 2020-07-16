@@ -30,4 +30,7 @@ package DelphiJSON;
 requires
   rtl;
 
+contains
+  DelphiJSON in 'DelphiJSON.pas';
+
 end.
