@@ -1,0 +1,48 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{5152E3C8-E936-4841-9B45-E946AFD75019}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="DelphiJSON.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="Tests\DelphiJSONTests.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="DelphiJSON">
+        <MSBuild Projects="DelphiJSON.dproj"/>
+    </Target>
+    <Target Name="DelphiJSON:Clean">
+        <MSBuild Projects="DelphiJSON.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="DelphiJSON:Make">
+        <MSBuild Projects="DelphiJSON.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="DelphiJSONTests">
+        <MSBuild Projects="Tests\DelphiJSONTests.dproj"/>
+    </Target>
+    <Target Name="DelphiJSONTests:Clean">
+        <MSBuild Projects="Tests\DelphiJSONTests.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="DelphiJSONTests:Make">
+        <MSBuild Projects="Tests\DelphiJSONTests.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="DelphiJSON;DelphiJSONTests"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="DelphiJSON:Clean;DelphiJSONTests:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="DelphiJSON:Make;DelphiJSONTests:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>

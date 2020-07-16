@@ -93,3 +93,10 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+
+# Testing Output
+dunit-report.xml
+dunitx-results.xml
+*.fb7lck
+*.fbl7
+*.fbpInf
