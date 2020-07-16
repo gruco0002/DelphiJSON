@@ -150,6 +150,7 @@ begin
 
   data := value.AsObject;
 
+  // TODO: ideally create one context per serialization
   context := TRttiContext.Create;
   dataType := context.GetType(data.ClassInfo);
 
@@ -159,6 +160,8 @@ begin
     context.Free;
     exit;
   end;
+
+  // TODO: split this function in smaller parts
 
   // handle a "standard" object and serialize it
 
