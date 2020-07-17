@@ -20,17 +20,17 @@ type
   end;
 
   /// This attribute allows a field or property to be serialized / deserialized.
-  JSONValueAttribute = class(TCustomAttribute)
+  DJValueAttribute = class(TCustomAttribute)
   public
     Name: string;
     constructor Create(const Name: string);
   end;
 
-  JSONSerializableAttribute = class(TCustomAttribute)
+  DJSerializableAttribute = class(TCustomAttribute)
 
   end;
 
-  EJSONError = class(Exception);
+  EDJError = class(Exception);
 
 function SerializeInternal(value: TValue): TJSONValue;
 
@@ -93,14 +93,14 @@ begin
 
   repeat
     // retrieve current object
-    currentValue := currentProperty.GetValue(enumerator);
+    currentValue := currentProperty.GetValue(enumerator.AsObject);
 
     // serialize it and add it to the result
     currentSerialized := SerializeInternal(currentValue);
     Result.AddElement(currentSerialized);
 
     // move to the next object
-    moveNextValue := moveNext.Invoke(enumerator);
+    moveNextValue := moveNext.Invoke(enumerator.AsObject, []);
     moveNextResult := moveNextValue.AsBoolean;
   until not moveNextResult;
 
@@ -141,7 +141,7 @@ begin
 
   repeat
     // retrieve current pair
-    currentPairValue := currentProperty.GetValue(enumerator);
+    currentPairValue := currentProperty.GetValue(enumerator.AsObject);
 
     keyValue := keyField.GetValue(currentPairValue.AsObject);
     valueValue := valueField.GetValue(currentPairValue.AsObject);
@@ -152,7 +152,7 @@ begin
     Result.AddPair(keyString, serializedValue);
 
     // move to the next object
-    moveNextValue := moveNext.Invoke(enumerator);
+    moveNextValue := moveNext.Invoke(enumerator.AsObject, []);
     moveNextResult := moveNextValue.AsBoolean;
   until not moveNextResult;
 
@@ -256,7 +256,7 @@ begin
   found := False;
   for attribute in dataType.GetAttributes() do
   begin
-    if attribute is JSONSerializableAttribute then
+    if attribute is DJSerializableAttribute then
     begin
       found := true;
       break;
@@ -265,7 +265,7 @@ begin
   if not found then
   begin
     context.Free;
-    raise EJSONError.Create
+    raise EDJError.Create
       ('Given object type is missing the JSONSerializable attribute');
   end;
 
@@ -281,10 +281,10 @@ begin
     found := False;
     for attribute in field.GetAttributes() do
     begin
-      if attribute is JSONValueAttribute then
+      if attribute is DJValueAttribute then
       begin
         found := true;
-        jsonFieldName := (attribute as JSONValueAttribute).Name.Trim;
+        jsonFieldName := (attribute as DJValueAttribute).Name.Trim;
         break;
       end;
     end;
@@ -299,7 +299,7 @@ begin
     if string.IsNullOrWhiteSpace(jsonFieldName) then
     begin
       context.Free;
-      raise EJSONError.Create('Invalid JSON field name: is null or whitespace');
+      raise EDJError.Create('Invalid JSON field name: is null or whitespace');
     end;
 
     // TODO: Add possibilities for converters here
@@ -346,13 +346,17 @@ begin
   begin
     Result := TJSONNull.Create;
   end
+  else if value.IsType<Boolean> then
+  begin
+    Result := TJSONBool.Create(value.AsBoolean);
+  end
   else if value.IsObject then
   begin
     Result := SerObject(value);
   end
   else
   begin
-    raise EJSONError.Create('Type not supported for serialization');
+    raise EDJError.Create('Type not supported for serialization');
   end;
 end;
 
@@ -360,7 +364,7 @@ end;
 
 constructor DelphiJSON<T>.Create;
 begin
-  raise EJSONError.Create('Do not create instances of this object!');
+  raise EDJError.Create('Do not create instances of this object!');
 end;
 
 class function DelphiJSON<T>.Deserialize(data: String): T;
@@ -386,13 +390,13 @@ class function DelphiJSON<T>.SerializeJ(data: T): TJSONValue;
 var
   valueObject: TValue;
 begin
-  valueObject := TValue.From(data);
+  valueObject := TValue.From<T>(data);
   Result := SerializeInternal(valueObject);
 end;
 
-{ JSONValueAttribute }
+{ DJValueAttribute }
 
-constructor JSONValueAttribute.Create(const Name: string);
+constructor DJValueAttribute.Create(const Name: string);
 begin
   self.Name := Name;
 end;

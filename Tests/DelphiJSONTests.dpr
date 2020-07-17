@@ -11,7 +11,8 @@ uses
   DUnitX.Loggers.Console,
   DUnitX.Loggers.Xml.NUnit,
   DUnitX.TestFramework,
-  BasicTests in 'BasicTests.pas';
+  BasicTests in 'BasicTests.pas',
+  JSONComparer in 'JSONComparer.pas';
 
 var
   runner : ITestRunner;
