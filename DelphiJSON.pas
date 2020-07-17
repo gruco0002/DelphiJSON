@@ -70,33 +70,120 @@ begin
 end;
 
 function SerTEnumerable(data: TObject; dataType: TRttiType): TJSONArray;
+var
+  getEnumerator: TRttiMethod;
+  enumerator: TValue;
+  moveNext: TRttiMethod;
+  currentProperty: TRttiProperty;
+  currentValue: TValue;
+  currentSerialized: TJSONValue;
+  moveNextValue: TValue;
+  moveNextResult: Boolean;
 begin
-  // TODO: implement
-
   // idea: fetch enumerator with rtti, enumerate using movenext, adding objects
   // to the array
+
+  getEnumerator := dataType.GetMethod('GetEnumerator');
+  getEnumerator.Invoke(data, enumerator);
+
+  moveNext := getEnumerator.ReturnType.GetMethod('MoveNext');
+  currentProperty := getEnumerator.ReturnType.GetProperty('Current');
+
+  Result := TJSONArray.Create;
+
+  repeat
+    // retrieve current object
+    currentValue := currentProperty.GetValue(enumerator);
+
+    // serialize it and add it to the result
+    currentSerialized := SerializeInternal(currentValue);
+    Result.AddElement(currentSerialized);
+
+    // move to the next object
+    moveNextValue := moveNext.Invoke(enumerator);
+    moveNextResult := moveNextValue.AsBoolean;
+  until not moveNextResult;
+
 end;
 
 function SerTDictionaryStringKey(data: TObject; dataType: TRttiType)
   : TJSONObject;
-begin
-  // TODO: implement
+var
+  getEnumerator: TRttiMethod;
+  enumerator: TValue;
+  moveNext: TRttiMethod;
+  currentProperty: TRttiProperty;
+  currentPairValue: TValue;
 
+  keyField: TRttiField;
+  valueField: TRttiField;
+  keyValue: TValue;
+  valueValue: TValue;
+  keyString: string;
+  serializedValue: TJSONValue;
+
+  moveNextValue: TValue;
+  moveNextResult: Boolean;
+begin
   // idea: the string keys are used as object field names and the values form
   // the respective field value
+
+  getEnumerator := dataType.GetMethod('GetEnumerator');
+  getEnumerator.Invoke(data, enumerator);
+
+  moveNext := getEnumerator.ReturnType.GetMethod('MoveNext');
+  currentProperty := getEnumerator.ReturnType.GetProperty('Current');
+
+  keyField := currentProperty.PropertyType.GetField('Key');
+  valueField := currentProperty.PropertyType.GetField('Value');
+
+  Result := TJSONObject.Create;
+
+  repeat
+    // retrieve current pair
+    currentPairValue := currentProperty.GetValue(enumerator);
+
+    keyValue := keyField.GetValue(currentPairValue.AsObject);
+    valueValue := valueField.GetValue(currentPairValue.AsObject);
+
+    keyString := keyValue.AsString;
+
+    serializedValue := SerializeInternal(valueValue);
+    Result.AddPair(keyString, serializedValue);
+
+    // move to the next object
+    moveNextValue := moveNext.Invoke(enumerator);
+    moveNextResult := moveNextValue.AsBoolean;
+  until not moveNextResult;
+
 end;
 
-function SerTDictionary(data: TObject; dataType: TRttiType): TJSONArray;
+function SerTPair(data: TObject; dataType: TRttiType): TJSONObject;
+var
+  keyField: TRttiField;
+  valueField: TRttiField;
+  keyValue: TValue;
+  valueValue: TValue;
+  serializedKey: TJSONValue;
+  serializedValue: TJSONValue;
 begin
-  // TODO: implement
+  keyField := dataType.GetField('Key');
+  valueField := dataType.GetField('Value');
 
-  // idea: output a list of json object each containing two fields: "key" and
-  // "value". The values of the field correspond to the respective dictionary
-  // values.
+  keyValue := keyField.GetValue(data);
+  valueValue := valueField.GetValue(data);
+
+  serializedKey := SerializeInternal(keyValue);
+  serializedValue := SerializeInternal(valueValue);
+
+  Result := TJSONObject.Create;
+  Result.AddPair('key', serializedKey);
+  Result.AddPair('value', serializedValue);
+
 end;
 
 function SerHandledSpecialCase(data: TObject; dataType: TRttiType;
-  var output: TJSONValue): boolean;
+  var output: TJSONValue): Boolean;
 var
   tmp: TRttiType;
 begin
@@ -110,10 +197,10 @@ begin
       exit;
     end;
 
-    if tmp.Name.StartsWith('TDictionary<', true) then
+    if tmp.Name.StartsWith('TPair<', true) then
     begin
       Result := true;
-      output := SerTDictionary(data, dataType);
+      output := SerTPair(data, dataType);
       exit;
     end;
 
@@ -136,7 +223,7 @@ var
   context: TRttiContext;
   dataType: TRttiType;
   attribute: TCustomAttribute;
-  found: boolean;
+  found: Boolean;
 
   resultObject: TJSONObject;
 
@@ -220,7 +307,7 @@ begin
     serializedField := SerializeInternal(fieldValue);
 
     // add the variable to the resulting object
-    (Result as TJSONObject).AddPair(jsonFieldName, serializedField);
+    resultObject.AddPair(jsonFieldName, serializedField);
 
   end;
 
