@@ -12,7 +12,9 @@ uses
   DUnitX.Loggers.Xml.NUnit,
   DUnitX.TestFramework,
   BasicTests in 'BasicTests.pas',
-  JSONComparer in 'JSONComparer.pas';
+  JSONComparer in 'JSONComparer.pas',
+  JSONComparerTests in 'JSONComparerTests.pas',
+  EnumerableTests in 'EnumerableTests.pas';
 
 var
   runner : ITestRunner;
