@@ -84,14 +84,19 @@ begin
   // to the array
 
   getEnumerator := dataType.GetMethod('GetEnumerator');
-  getEnumerator.Invoke(data, enumerator);
+  enumerator := getEnumerator.Invoke(data, []);
 
   moveNext := getEnumerator.ReturnType.GetMethod('MoveNext');
   currentProperty := getEnumerator.ReturnType.GetProperty('Current');
 
   Result := TJSONArray.Create;
 
-  repeat
+  // inital move
+  moveNextValue := moveNext.Invoke(enumerator.AsObject, []);
+  moveNextResult := moveNextValue.AsBoolean;
+
+  while moveNextResult do
+  begin
     // retrieve current object
     currentValue := currentProperty.GetValue(enumerator.AsObject);
 
@@ -102,7 +107,7 @@ begin
     // move to the next object
     moveNextValue := moveNext.Invoke(enumerator.AsObject, []);
     moveNextResult := moveNextValue.AsBoolean;
-  until not moveNextResult;
+  end;
 
 end;
 
@@ -129,7 +134,7 @@ begin
   // the respective field value
 
   getEnumerator := dataType.GetMethod('GetEnumerator');
-  getEnumerator.Invoke(data, enumerator);
+  enumerator := getEnumerator.Invoke(data, []);
 
   moveNext := getEnumerator.ReturnType.GetMethod('MoveNext');
   currentProperty := getEnumerator.ReturnType.GetProperty('Current');
@@ -139,7 +144,12 @@ begin
 
   Result := TJSONObject.Create;
 
-  repeat
+  // inital move
+  moveNextValue := moveNext.Invoke(enumerator.AsObject, []);
+  moveNextResult := moveNextValue.AsBoolean;
+
+  while moveNextResult do
+  begin
     // retrieve current pair
     currentPairValue := currentProperty.GetValue(enumerator.AsObject);
 
@@ -154,7 +164,7 @@ begin
     // move to the next object
     moveNextValue := moveNext.Invoke(enumerator.AsObject, []);
     moveNextResult := moveNextValue.AsBoolean;
-  until not moveNextResult;
+  end;
 
 end;
 

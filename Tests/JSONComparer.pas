@@ -46,8 +46,25 @@ begin
 end;
 
 function CmpArray(value1: TJSONArray; value2: TJSONArray): Boolean;
+var
+  i: integer;
 begin
-  // TODO: implement
+  if value1.Count <> value2.Count then
+  begin
+    Result := false;
+    exit;
+  end;
+
+  for i := 0 to value1.Count - 1 do
+  begin
+    if not JSONEquals(value1.Items[i], value2.Items[i]) then
+    begin
+      Result := false;
+      exit;
+    end;
+  end;
+
+  Result := true;
 end;
 
 function JSONEquals(value1: TJSONValue; value2: TJSONValue): Boolean;

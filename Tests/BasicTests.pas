@@ -16,9 +16,6 @@ type
     procedure TearDown;
 
     [Test]
-    procedure SystemJSONComparison;
-
-    [Test]
     procedure BasicSerializeTest;
   end;
 
@@ -52,37 +49,6 @@ procedure TBasicTests.TearDown;
 begin
 end;
 
-procedure TBasicTests.SystemJSONComparison;
-var
-  i, j, k: TJSONObject;
-begin
-  i := TJSONObject.Create;
-  i.AddPair('test', TJSONNumber.Create(15));
-  i.AddPair('test2', TJSONString.Create('Hello world'));
-
-  j := TJSONObject.Create;
-  j.AddPair('test2', TJSONString.Create('Hello world'));
-  j.AddPair('test', TJSONNumber.Create(15));
-
-  Assert.IsTrue(JSONEquals(i, j));
-  Assert.IsTrue(JSONEquals(j, i));
-  Assert.IsTrue(JSONEquals(i, i));
-  Assert.IsTrue(JSONEquals(j, j));
-
-  k := TJSONObject.Create;
-  k.AddPair('test2', TJSONString.Create('Hello world'));
-  k.AddPair('test123', TJSONNumber.Create(123));
-  k.AddPair('test', TJSONNumber.Create(15));
-
-  Assert.IsFalse(JSONEquals(k, i));
-  Assert.IsFalse(JSONEquals(j, k));
-  Assert.IsTrue(JSONEquals(k, k));
-
-  i.Free;
-  j.Free;
-  k.Free;
-end;
-
 procedure TBasicTests.BasicSerializeTest;
 const
   res = '{"textField": "testText1", "boolField": true, "int": 123}';
@@ -108,6 +74,9 @@ begin
   obj2 := TJSONObject.ParseJSONValue(res, false, True);
 
   Assert.IsTrue(JSONEquals(obj1, obj2));
+
+  obj1.Free;
+  obj2.Free;
 
 end;
 
