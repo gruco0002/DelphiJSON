@@ -3,7 +3,7 @@ unit DelphiJSON;
 interface
 
 uses
-  System.SysUtils, System.JSON, System.RTTI;
+  System.SysUtils, System.JSON, System.RTTI, System.Generics.Collections;
 
 type
   DelphiJSON<T> = class
@@ -32,11 +32,28 @@ type
 
   EDJError = class(Exception);
 
-function SerializeInternal(value: TValue): TJSONValue;
+  TSerContext = class
+  private
+    path: TStack<string>;
+  public
+    RTTI: TRttiContext;
+
+    constructor Create;
+    destructor Destroy;
+
+    function FullPath: string;
+    procedure PushPath(val: string);
+    procedure PopPath;
+
+    function ToString: string;
+
+  end;
+
+function SerializeInternal(value: TValue; context: TSerContext): TJSONValue;
 
 implementation
 
-function SerArray(value: TValue): TJSONArray;
+function SerArray(value: TValue; context: TSerContext): TJSONArray;
 var
   size: integer;
   i: integer;
@@ -45,31 +62,34 @@ begin
   size := value.GetArrayLength;
   for i := 0 to size - 1 do
   begin
-    Result.AddElement(SerializeInternal(value.GetArrayElement(i)));
+    context.PushPath(i.ToString);
+    Result.AddElement(SerializeInternal(value.GetArrayElement(i), context));
+    context.PopPath;
   end;
 end;
 
-function SerFloat(value: TValue): TJSONNumber;
+function SerFloat(value: TValue; context: TSerContext): TJSONNumber;
 begin
   Result := TJSONNumber.Create(value.AsType<Single>());
 end;
 
-function SerInt64(value: TValue): TJSONNumber;
+function SerInt64(value: TValue; context: TSerContext): TJSONNumber;
 begin
   Result := TJSONNumber.Create(value.AsInt64);
 end;
 
-function SerInt(value: TValue): TJSONNumber;
+function SerInt(value: TValue; context: TSerContext): TJSONNumber;
 begin
   Result := TJSONNumber.Create(value.AsInteger);
 end;
 
-function SerString(value: TValue): TJSONString;
+function SerString(value: TValue; context: TSerContext): TJSONString;
 begin
   Result := TJSONString.Create(value.AsString);
 end;
 
-function SerTEnumerable(data: TObject; dataType: TRttiType): TJSONArray;
+function SerTEnumerable(data: TObject; dataType: TRttiType;
+  context: TSerContext): TJSONArray;
 var
   getEnumerator: TRttiMethod;
   enumerator: TValue;
@@ -79,6 +99,7 @@ var
   currentSerialized: TJSONValue;
   moveNextValue: TValue;
   moveNextResult: Boolean;
+  i: integer;
 begin
   // idea: fetch enumerator with rtti, enumerate using movenext, adding objects
   // to the array
@@ -95,24 +116,28 @@ begin
   moveNextValue := moveNext.Invoke(enumerator.AsObject, []);
   moveNextResult := moveNextValue.AsBoolean;
 
+  i := 0;
   while moveNextResult do
   begin
     // retrieve current object
     currentValue := currentProperty.GetValue(enumerator.AsObject);
 
     // serialize it and add it to the result
-    currentSerialized := SerializeInternal(currentValue);
+    context.PushPath(i.ToString);
+    currentSerialized := SerializeInternal(currentValue, context);
+    context.PopPath;
     Result.AddElement(currentSerialized);
 
     // move to the next object
     moveNextValue := moveNext.Invoke(enumerator.AsObject, []);
     moveNextResult := moveNextValue.AsBoolean;
+    Inc(i);
   end;
 
 end;
 
-function SerTDictionaryStringKey(data: TObject; dataType: TRttiType)
-  : TJSONObject;
+function SerTDictionaryStringKey(data: TObject; dataType: TRttiType;
+  context: TSerContext): TJSONObject;
 var
   getEnumerator: TRttiMethod;
   enumerator: TValue;
@@ -158,7 +183,9 @@ begin
 
     keyString := keyValue.AsString;
 
-    serializedValue := SerializeInternal(valueValue);
+    context.PushPath(keyString);
+    serializedValue := SerializeInternal(valueValue, context);
+    context.PopPath;
     Result.AddPair(keyString, serializedValue);
 
     // move to the next object
@@ -168,7 +195,8 @@ begin
 
 end;
 
-function SerTPair(data: TObject; dataType: TRttiType): TJSONObject;
+function SerTPair(data: TObject; dataType: TRttiType; context: TSerContext)
+  : TJSONObject;
 var
   keyField: TRttiField;
   valueField: TRttiField;
@@ -183,8 +211,12 @@ begin
   keyValue := keyField.GetValue(data);
   valueValue := valueField.GetValue(data);
 
-  serializedKey := SerializeInternal(keyValue);
-  serializedValue := SerializeInternal(valueValue);
+  context.PushPath('key');
+  serializedKey := SerializeInternal(keyValue, context);
+  context.PopPath;
+  context.PushPath('value');
+  serializedValue := SerializeInternal(valueValue, context);
+  context.PopPath;
 
   Result := TJSONObject.Create;
   Result.AddPair('key', serializedKey);
@@ -193,7 +225,7 @@ begin
 end;
 
 function SerHandledSpecialCase(data: TObject; dataType: TRttiType;
-  var output: TJSONValue): Boolean;
+  var output: TJSONValue; context: TSerContext): Boolean;
 var
   tmp: TRttiType;
 begin
@@ -203,21 +235,21 @@ begin
     if tmp.Name.StartsWith('TDictionary<string,', true) then
     begin
       Result := true;
-      output := SerTDictionaryStringKey(data, dataType);
+      output := SerTDictionaryStringKey(data, dataType, context);
       exit;
     end;
 
     if tmp.Name.StartsWith('TPair<', true) then
     begin
       Result := true;
-      output := SerTPair(data, dataType);
+      output := SerTPair(data, dataType, context);
       exit;
     end;
 
     if tmp.Name.StartsWith('TEnumerable<', true) then
     begin
       Result := true;
-      output := SerTEnumerable(data, dataType);
+      output := SerTEnumerable(data, dataType, context);
       exit;
     end;
 
@@ -227,10 +259,9 @@ begin
   Result := False;
 end;
 
-function SerObject(value: TValue): TJSONValue;
+function SerObject(value: TValue; context: TSerContext): TJSONValue;
 var
   data: TObject;
-  context: TRttiContext;
   dataType: TRttiType;
   attribute: TCustomAttribute;
   found: Boolean;
@@ -247,14 +278,11 @@ begin
 
   data := value.AsObject;
 
-  // TODO: ideally create one context per serialization
-  context := TRttiContext.Create;
-  dataType := context.GetType(data.ClassInfo);
+  dataType := context.RTTI.GetType(data.ClassInfo);
 
   // checking if a special case handled the type of data
-  if SerHandledSpecialCase(data, dataType, Result) then
+  if SerHandledSpecialCase(data, dataType, Result, context) then
   begin
-    context.Free;
     exit;
   end;
 
@@ -274,9 +302,9 @@ begin
   end;
   if not found then
   begin
-    context.Free;
     raise EDJError.Create
-      ('Given object type is missing the JSONSerializable attribute');
+      ('Given object type is missing the JSONSerializable attribute. ' +
+      context.ToString);
   end;
 
   // Init the result object
@@ -308,25 +336,25 @@ begin
     // check if the field name is valid
     if string.IsNullOrWhiteSpace(jsonFieldName) then
     begin
-      context.Free;
-      raise EDJError.Create('Invalid JSON field name: is null or whitespace');
+      raise EDJError.Create('Invalid JSON field name: is null or whitespace. ' +
+        context.ToString);
     end;
 
     // TODO: Add possibilities for converters here
     fieldValue := field.GetValue(data);
-    serializedField := SerializeInternal(fieldValue);
+
+    context.PushPath(jsonFieldName);
+    serializedField := SerializeInternal(fieldValue, context);
+    context.PopPath;
 
     // add the variable to the resulting object
     resultObject.AddPair(jsonFieldName, serializedField);
 
   end;
 
-  // free the context
-  context.Free;
-
 end;
 
-function SerializeInternal(value: TValue): TJSONValue;
+function SerializeInternal(value: TValue; context: TSerContext): TJSONValue;
 begin
   // check for the type and call the appropriate subroutine for serialization
 
@@ -334,23 +362,23 @@ begin
 
   if value.IsArray then
   begin
-    Result := SerArray(value);
+    Result := SerArray(value, context);
   end
   else if value.Kind = TTypeKind.tkFloat then
   begin
-    Result := SerFloat(value);
+    Result := SerFloat(value, context);
   end
   else if value.Kind = TTypeKind.tkInt64 then
   begin
-    Result := SerInt64(value);
+    Result := SerInt64(value, context);
   end
   else if value.Kind = TTypeKind.tkInteger then
   begin
-    Result := SerInt(value);
+    Result := SerInt(value, context);
   end
   else if value.IsType<string>(False) then
   begin
-    Result := SerString(value);
+    Result := SerString(value, context);
   end
   else if value.IsEmpty then
   begin
@@ -362,12 +390,18 @@ begin
   end
   else if value.IsObject then
   begin
-    Result := SerObject(value);
+    Result := SerObject(value, context);
   end
   else
   begin
-    raise EDJError.Create('Type not supported for serialization');
+    raise EDJError.Create('Type not supported for serialization. ' +
+      context.ToString);
   end;
+end;
+
+function DeserializeInternal(value: TJSONValue; dataType: TRttiType): TValue;
+begin
+
 end;
 
 { DelphiJSON<T> }
@@ -399,9 +433,12 @@ end;
 class function DelphiJSON<T>.SerializeJ(data: T): TJSONValue;
 var
   valueObject: TValue;
+  context: TSerContext;
 begin
+  context := TSerContext.Create;
   valueObject := TValue.From<T>(data);
-  Result := SerializeInternal(valueObject);
+  Result := SerializeInternal(valueObject, context);
+  context.Free;
 end;
 
 { DJValueAttribute }
@@ -409,6 +446,46 @@ end;
 constructor DJValueAttribute.Create(const Name: string);
 begin
   self.Name := Name;
+end;
+
+{ TSerContext }
+
+constructor TSerContext.Create;
+begin
+  self.path := TStack<string>.Create;
+  self.RTTI := TRttiContext.Create;
+end;
+
+destructor TSerContext.Destroy;
+begin
+  self.path.Free;
+  self.RTTI.Free;
+end;
+
+function TSerContext.FullPath: string;
+var
+  ele: string;
+begin
+  Result := '';
+  for ele in path do
+  begin
+    Result := Result + '>' + ele;
+  end;
+end;
+
+procedure TSerContext.PopPath;
+begin
+  path.Pop;
+end;
+
+procedure TSerContext.PushPath(val: string);
+begin
+  path.Push(val);
+end;
+
+function TSerContext.ToString: string;
+begin
+  Result := 'Context: { ' + FullPath + ' }';
 end;
 
 end.
