@@ -474,6 +474,12 @@ begin
   end;
 end;
 
+function DerBool(value: TJSONBool; dataType: TRttiType;
+  context: TDerContext): TValue;
+begin
+  Result := TValue.From(value.AsBoolean);
+end;
+
 function DerString(value: TJSONString; dataType: TRttiType;
   context: TDerContext): TValue;
 var
@@ -509,6 +515,14 @@ begin
       raise EDJError.Create(typeMismatch + context.ToString);
     end;
     Result := DerArray(value as TJSONArray, dataType, context);
+  end
+  else if dataType.Handle = System.TypeInfo(Boolean) then
+  begin
+    if not(value is TJSONBool) then
+    begin
+      raise EDJError.Create(typeMismatch + context.ToString);
+    end;
+    Result := DerBool(value as TJSONBool, dataType, context);
   end
   else if dataType.Handle^.Kind = TTypeKind.tkInt64 then
   begin
