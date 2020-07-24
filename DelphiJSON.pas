@@ -489,18 +489,177 @@ begin
   Result := TValue.From(val);
 end;
 
-function DerHandledSpecialCase(value: TJSONObject; dataType: TRttiType;
-  var obj: TValue; context: TDerContext): Boolean;
+procedure DerTDictionaryStringKey(value: TJSONValue; dataType: TRttiType;
+  var obj: TValue; context: TDerContext);
 begin
   // TODO: implement
+end;
+
+procedure DerTDictionary(value: TJSONValue; dataType: TRttiType;
+  var obj: TValue; context: TDerContext);
+var
+  jsonArray: TJSONArray;
+
+  addMethod: TRttiMethod;
+begin
+  // TODO: implement
+  if not(value is TJSONArray) then
+  begin
+    raise EDJError.Create('Expected a JSON array. ' + context.ToString);
+  end;
+  jsonArray := value as TJSONArray;
+
+  addMethod := dataType.GetMethod('AddOrSetValue');
+
+end;
+
+procedure DerTPair(value: TJSONValue; dataType: TRttiType; var obj: TValue;
+  context: TDerContext);
+var
+  jsonObject: TJSONObject;
+  jsonKey: TJSONValue;
+  jsonValue: TJSONValue;
+
+  typeKey: TRttiType;
+  typeValue: TRttiType;
+
+  valueKey: TValue;
+  valueValue: TValue;
+begin
+  if not(value is TJSONObject) then
+  begin
+    raise EDJError.Create('Expected a JSON object. ' + context.ToString);
+  end;
+  jsonObject := value as TJSONObject;
+
+  jsonKey := jsonObject.GetValue('key');
+  if jsonKey = nil then
+  begin
+    raise EDJError.Create('Expected a field with name "key". ' +
+      context.ToString);
+  end;
+
+  jsonValue := jsonObject.GetValue('value');
+  if jsonKey = nil then
+  begin
+    raise EDJError.Create('Expected a field with name "value". ' +
+      context.ToString);
+  end;
+
+  typeKey := dataType.GetField('Key').FieldType;
+  typeValue := dataType.GetField('Value').FieldType;
+
+  context.PushPath('key');
+  valueKey := DeserializeInternal(jsonKey, typeKey, context);
+  context.PopPath;
+  context.PushPath('value');
+  valueValue := DeserializeInternal(jsonValue, typeValue, context);
+  context.PopPath;
+
+  // apply the values to the object
+  dataType.GetField('Key').SetValue(obj.AsObject, valueKey);
+  dataType.GetField('Value').SetValue(obj.AsObject, valueValue);
+end;
+
+procedure DerTEnumerable(value: TJSONValue; dataType: TRttiType;
+  var obj: TValue; context: TDerContext);
+var
+  jsonArray: TJSONArray;
+
+  addMethod: TRttiMethod;
+  ElementType: TRttiType;
+
+  jsonValue: TJSONValue;
+  i: integer;
+  elementValue: TValue;
+
+begin
+  if not(value is TJSONArray) then
+  begin
+    raise EDJError.Create('Expected a JSON array. ' + context.ToString);
+  end;
+  jsonArray := value as TJSONArray;
+
+  addMethod := dataType.GetMethod('Add');
+  if addMethod = nil then
+  begin
+    addMethod := dataType.GetMethod('Enqueue');
+  end;
+  if addMethod = nil then
+  begin
+    addMethod := dataType.GetMethod('Push');
+  end;
+  if addMethod = nil then
+  begin
+    raise EDJError.Create('Could not find a method to add items to the object. '
+      + context.ToString);
+  end;
+  ElementType := addMethod.GetParameters[0].ParamType;
+
+  for i := 0 to jsonArray.Count - 1 do
+  begin
+
+    jsonValue := jsonArray.Items[i];
+    context.PushPath(i.ToString);
+    elementValue := DeserializeInternal(jsonValue, ElementType, context);
+    context.PopPath;
+
+    // add the element value to the object
+    addMethod.Invoke(obj, [elementValue]);
+  end;
+
+end;
+
+function DerHandledSpecialCase(value: TJSONValue; dataType: TRttiType;
+  var obj: TValue; context: TDerContext): Boolean;
+var
+  tmp: TRttiType;
+begin
+  tmp := dataType;
+  while tmp <> nil do
+  begin
+    if tmp.Name.StartsWith('TDictionary<string,', true) then
+    begin
+      Result := true;
+      DerTDictionaryStringKey(value, dataType, obj, context);
+      exit;
+    end;
+
+    if tmp.Name.StartsWith('TDictionary<', true) then
+    begin
+      Result := true;
+      DerTDictionary(value, dataType, obj, context);
+      exit;
+    end;
+
+    if tmp.Name.StartsWith('TPair<', true) then
+    begin
+      Result := true;
+      DerTPair(value, dataType, obj, context);
+      exit;
+    end;
+
+    if tmp.Name.StartsWith('TEnumerable<', true) then
+    begin
+      Result := true;
+      DerTEnumerable(value, dataType, obj, context);
+      exit;
+    end;
+
+    tmp := tmp.BaseType;
+  end;
+
   Result := False;
 end;
 
-function DerObject(value: TJSONObject; dataType: TRttiType;
+function DerObject(value: TJSONValue; dataType: TRttiType;
   context: TDerContext): TValue;
 var
   objType: TRttiInstanceType;
   objValue: TValue;
+
+  jsonObject: TJSONObject;
+
   attribute: TCustomAttribute;
   found: Boolean;
 
@@ -511,7 +670,6 @@ var
 
   fieldValue: TValue;
 begin
-  // TODO: implement
 
   // create a new instance of the object
   objType := dataType.AsInstance;
@@ -522,6 +680,13 @@ begin
     Result := objValue;
     exit;
   end;
+
+  // check if this is a json object
+  if not(value is TJSONObject) then
+  begin
+    raise EDJError.Create('Expected a JSON Object. ' + context.ToString);
+  end;
+  jsonObject := value as TJSONObject;
 
   // handle a "standard" object and deserialize it
 
@@ -573,7 +738,7 @@ begin
 
     // check if the field name exists in the json structure
 
-    jsonValue := value.GetValue(jsonFieldName);
+    jsonValue := jsonObject.GetValue(jsonFieldName);
     if jsonValue = nil then
     begin
       raise EDJError.Create('Value with name "' + jsonFieldName +
@@ -688,10 +853,6 @@ begin
     end
     else
     begin
-      if not(value is TJSONObject) then
-      begin
-        raise EDJError.Create(typeMismatch + context.ToString);
-      end;
       Result := DerObject(value as TJSONObject, dataType, context);
     end;
   end
