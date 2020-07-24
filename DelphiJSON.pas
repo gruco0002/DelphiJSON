@@ -489,10 +489,110 @@ begin
   Result := TValue.From(val);
 end;
 
-function DerObject(value: TJSONObject; dataType: TRttiType;
-  context: TDerContext): TValue;
+function DerHandledSpecialCase(value: TJSONObject; dataType: TRttiType;
+  var obj: TValue; context: TDerContext): Boolean;
 begin
   // TODO: implement
+  Result := False;
+end;
+
+function DerObject(value: TJSONObject; dataType: TRttiType;
+  context: TDerContext): TValue;
+var
+  objType: TRttiInstanceType;
+  objValue: TValue;
+  attribute: TCustomAttribute;
+  found: Boolean;
+
+  objectFields: TArray<TRttiField>;
+  field: TRttiField;
+  jsonFieldName: string;
+  jsonValue: TJSONValue;
+
+  fieldValue: TValue;
+begin
+  // TODO: implement
+
+  // create a new instance of the object
+  objType := dataType.AsInstance;
+  objValue := objType.GetMethod('Create').Invoke(objType.MetaclassType, []);
+
+  if DerHandledSpecialCase(value, dataType, objValue, context) then
+  begin
+    Result := objValue;
+    exit;
+  end;
+
+  // handle a "standard" object and deserialize it
+
+  // Ensure the object has the serializable attribute. (Fields added later)
+  found := False;
+  for attribute in dataType.GetAttributes() do
+  begin
+    if attribute is DJSerializableAttribute then
+    begin
+      found := true;
+      break;
+    end;
+  end;
+  if not found then
+  begin
+    raise EDJError.Create
+      ('Given object type is missing the JSONSerializable attribute. ' +
+      context.ToString);
+  end;
+
+  // getting fields from the object
+  objectFields := dataType.GetFields;
+  for field in objectFields do
+  begin
+    // check for the jsonValue parameter
+    found := False;
+    for attribute in field.GetAttributes() do
+    begin
+      if attribute is DJValueAttribute then
+      begin
+        found := true;
+        jsonFieldName := (attribute as DJValueAttribute).Name.Trim;
+        break;
+      end;
+    end;
+
+    if not found then
+    begin
+      // skip this field since it is not opted-in for serialization
+      continue;
+    end;
+
+    // check if the field name is valid
+    if string.IsNullOrWhiteSpace(jsonFieldName) then
+    begin
+      raise EDJError.Create('Invalid JSON field name: is null or whitespace. ' +
+        context.ToString);
+    end;
+
+    // check if the field name exists in the json structure
+
+    jsonValue := value.GetValue(jsonFieldName);
+    if jsonValue = nil then
+    begin
+      raise EDJError.Create('Value with name "' + jsonFieldName +
+        '" missing in JSON data. ' + context.ToString);
+    end;
+
+    // TODO: Add possibilities for converters here
+
+    context.PushPath(jsonFieldName);
+    fieldValue := DeserializeInternal(jsonValue, field.FieldType, context);
+    context.PopPath;
+
+    // set the value in the resulting object
+    field.SetValue(objValue.AsObject, fieldValue);
+
+  end;
+
+  Result := objValue;
+
 end;
 
 function DeserializeInternal(value: TJSONValue; dataType: TRttiType;
