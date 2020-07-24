@@ -49,7 +49,11 @@ type
 
   end;
 
+  TDerContext = TSerContext;
+
 function SerializeInternal(value: TValue; context: TSerContext): TJSONValue;
+function DeserializeInternal(value: TJSONValue; dataType: TRttiType;
+  context: TDerContext): TValue;
 
 implementation
 
@@ -399,9 +403,189 @@ begin
   end;
 end;
 
-function DeserializeInternal(value: TJSONValue; dataType: TRttiType): TValue;
+function DerArray(value: TJSONArray; dataType: TRttiType;
+  context: TDerContext): TValue;
+var
+  res: array of TValue;
+  valueType: TRttiType;
+  i: integer;
+  staticType: TRttiArrayType;
 begin
+  if dataType.Handle^.Kind = TTypeKind.tkDynArray then
+  begin
+    // dynamic array
+    SetLength(res, value.Count);
+    valueType := TRttiDynamicArrayType(dataType).ElementType;
+    for i := 0 to High(res) do
+    begin
+      context.PushPath(i.ToString);
+      res[i] := DeserializeInternal(value.Items[i], valueType, context);
+      context.PopPath;
+    end;
+    Result := TValue.FromArray(dataType.Handle, res);
+  end
+  else
+  begin
+    // static array
+    staticType := TRttiArrayType(dataType);
+    if staticType.TotalElementCount <> value.Count then
+    begin
+      raise EDJError.Create
+        ('Element count of the given JSON array does not match the size of a static array. '
+        + context.ToString);
+    end;
 
+    SetLength(res, value.Count);
+    valueType := staticType.ElementType;
+    for i := 0 to High(res) do
+    begin
+      context.PushPath(i.ToString);
+      res[i] := DeserializeInternal(value.Items[i], valueType, context);
+      context.PopPath;
+    end;
+    Result := TValue.FromArray(staticType.Handle, res);
+  end;
+end;
+
+function DerNumber(value: TJSONNumber; dataType: TRttiType;
+  context: TDerContext): TValue;
+var
+  valFloat: Double;
+  valInt64: Int64;
+  valInt: integer;
+begin
+  if dataType.Handle^.Kind = TTypeKind.tkFloat then
+  begin
+    // floating point number
+    valFloat := value.AsDouble;
+    Result := TValue.From(valFloat);
+  end
+  else if dataType.Handle^.Kind = TTypeKind.tkInt64 then
+  begin
+    // integer 64 bit number
+    valInt64 := value.AsInt64;
+    Result := TValue.From(valInt64);
+  end
+  else
+  begin
+    // int number
+    valInt := value.AsInt;
+    Result := TValue.From(valInt);
+  end;
+end;
+
+function DerString(value: TJSONString; dataType: TRttiType;
+  context: TDerContext): TValue;
+var
+  val: string;
+begin
+  val := value.value;
+  Result := TValue.From(val);
+end;
+
+function DerObject(value: TJSONObject; dataType: TRttiType;
+  context: TDerContext): TValue;
+begin
+  // TODO: implement
+end;
+
+function DeserializeInternal(value: TJSONValue; dataType: TRttiType;
+  context: TDerContext): TValue;
+const
+  typeMismatch = 'JSON value type does not match field type. ';
+begin
+  if dataType.Handle^.Kind = TTypeKind.tkArray then
+  begin
+    if not(value is TJSONArray) then
+    begin
+      raise EDJError.Create(typeMismatch + context.ToString);
+    end;
+    Result := DerArray(value as TJSONArray, dataType, context);
+  end
+  else if dataType.Handle^.Kind = TTypeKind.tkDynArray then
+  begin
+    if not(value is TJSONArray) then
+    begin
+      raise EDJError.Create(typeMismatch + context.ToString);
+    end;
+    Result := DerArray(value as TJSONArray, dataType, context);
+  end
+  else if dataType.Handle^.Kind = TTypeKind.tkInt64 then
+  begin
+    if not(value is TJSONNumber) then
+    begin
+      raise EDJError.Create(typeMismatch + context.ToString);
+    end;
+    Result := DerNumber(value as TJSONNumber, dataType, context);
+  end
+  else if dataType.Handle^.Kind = TTypeKind.tkInteger then
+  begin
+    if not(value is TJSONNumber) then
+    begin
+      raise EDJError.Create(typeMismatch + context.ToString);
+    end;
+    Result := DerNumber(value as TJSONNumber, dataType, context);
+  end
+  else if dataType.Handle^.Kind = TTypeKind.tkFloat then
+  begin
+    if not(value is TJSONNumber) then
+    begin
+      raise EDJError.Create(typeMismatch + context.ToString);
+    end;
+    Result := DerNumber(value as TJSONNumber, dataType, context);
+  end
+  else if dataType.Handle^.Kind = TTypeKind.tkString then
+  begin
+    if not(value is TJSONString) then
+    begin
+      raise EDJError.Create(typeMismatch + context.ToString);
+    end;
+    Result := DerString(value as TJSONString, dataType, context);
+  end
+  else if dataType.Handle^.Kind = TTypeKind.tkWString then
+  begin
+    if not(value is TJSONString) then
+    begin
+      raise EDJError.Create(typeMismatch + context.ToString);
+    end;
+    Result := DerString(value as TJSONString, dataType, context);
+  end
+  else if dataType.Handle^.Kind = TTypeKind.tkUString then
+  begin
+    if not(value is TJSONString) then
+    begin
+      raise EDJError.Create(typeMismatch + context.ToString);
+    end;
+    Result := DerString(value as TJSONString, dataType, context);
+  end
+  else if dataType.Handle^.Kind = TTypeKind.tkLString then
+  begin
+    if not(value is TJSONString) then
+    begin
+      raise EDJError.Create(typeMismatch + context.ToString);
+    end;
+    Result := DerString(value as TJSONString, dataType, context);
+  end
+  else if dataType.Handle^.Kind = TTypeKind.tkClass then
+  begin
+    if value is TJSONNull then
+    begin
+      Result := TValue.From<TObject>(nil);
+    end
+    else
+    begin
+      if not(value is TJSONObject) then
+      begin
+        raise EDJError.Create(typeMismatch + context.ToString);
+      end;
+      Result := DerObject(value as TJSONObject, dataType, context);
+    end;
+  end
+  else
+  begin
+    raise EDJError.Create('Type of field is not supported for deserialization. '
+      + context.ToString);
+  end;
 end;
 
 { DelphiJSON<T> }
@@ -412,13 +596,25 @@ begin
 end;
 
 class function DelphiJSON<T>.Deserialize(data: String): T;
+var
+  val: TJSONValue;
 begin
-  // TODO: implement
+  val := TJSONObject.ParseJSONValue(data, true, true);
+  Result := DeserializeJ(val);
+  val.Free;
 end;
 
 class function DelphiJSON<T>.DeserializeJ(data: TJSONValue): T;
+var
+  context: TDerContext;
+  rttiType: TRttiType;
+  res: TValue;
 begin
-  // TODO: implement
+  context := TDerContext.Create;
+  rttiType := context.RTTI.GetType(System.TypeInfo(T));
+  res := DeserializeInternal(data, rttiType, context);
+  context.Free;
+  Result := res.AsType<T>();
 end;
 
 class function DelphiJSON<T>.Serialize(data: T): string;
