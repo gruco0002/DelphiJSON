@@ -360,7 +360,7 @@ begin
   // check for the type and call the appropriate subroutine for serialization
 
   dataType := context.RTTI.GetType(value.TypeInfo);
-  
+
   // checking if a special case handled the type of data
   if SerHandledSpecialCase(value, dataType, Result, context) then
   begin
@@ -405,6 +405,16 @@ begin
     raise EDJError.Create('Type not supported for serialization. ' +
       context.ToString);
   end;
+end;
+
+function DerConstructObject(dataType: TRttiType; context: TDerContext): TValue;
+var
+  objType: TRttiInstanceType;
+begin
+  objType := dataType.AsInstance;
+
+  // TODO: find correct constructor (since create is not always supported with no arguments)
+  Result := objType.GetMethod('Create').Invoke(objType.MetaclassType, []);
 end;
 
 function DerArray(value: TJSONArray; dataType: TRttiType;
@@ -494,7 +504,7 @@ begin
 end;
 
 procedure DerTDictionaryStringKey(value: TJSONValue; dataType: TRttiType;
-  var obj: TValue; context: TDerContext);
+  var objOut: TValue; context: TDerContext);
 var
   jsonObject: TJSONObject;
 
@@ -516,6 +526,9 @@ begin
   end;
   jsonObject := value as TJSONObject;
 
+  // create object
+  objOut := DerConstructObject(dataType, context);
+
   // get the method that we will use to add into the dictionary
   addMethod := dataType.GetMethod('AddOrSetValue');
 
@@ -534,13 +547,13 @@ begin
     context.PopPath;
 
     // add the deserialized values to the dictionary
-    addMethod.Invoke(obj, [valueKey, valueValue]);
+    addMethod.Invoke(objOut, [valueKey, valueValue]);
 
   end;
 end;
 
 procedure DerTDictionary(value: TJSONValue; dataType: TRttiType;
-  var obj: TValue; context: TDerContext);
+  var objOut: TValue; context: TDerContext);
 var
   jsonArray: TJSONArray;
 
@@ -563,6 +576,9 @@ begin
     raise EDJError.Create('Expected a JSON array. ' + context.ToString);
   end;
   jsonArray := value as TJSONArray;
+
+  // construct object
+  objOut := DerConstructObject(dataType, context);
 
   // get the method that we will use to add into the dictionary
   addMethod := dataType.GetMethod('AddOrSetValue');
@@ -606,7 +622,7 @@ begin
     context.PopPath;
 
     // add the deserialized values to the dictionary
-    addMethod.Invoke(obj, [valueKey, valueValue]);
+    addMethod.Invoke(objOut, [valueKey, valueValue]);
 
     context.PopPath;
 
@@ -614,7 +630,7 @@ begin
 
 end;
 
-procedure DerTPair(value: TJSONValue; dataType: TRttiType; var obj: TValue;
+procedure DerTPair(value: TJSONValue; dataType: TRttiType; var objOut: TValue;
   context: TDerContext);
 var
   jsonObject: TJSONObject;
@@ -647,6 +663,11 @@ begin
       context.ToString);
   end;
 
+  // create pair
+  // TODO: check if this is correct. (alternative TValue.Empty.Cast(type) )
+  TValue.Make(nil, dataType.Handle, objOut);
+
+  // deserialize values
   typeKey := dataType.GetField('Key').FieldType;
   typeValue := dataType.GetField('Value').FieldType;
 
@@ -658,12 +679,12 @@ begin
   context.PopPath;
 
   // apply the values to the object
-  dataType.GetField('Key').SetValue(obj.AsObject, valueKey);
-  dataType.GetField('Value').SetValue(obj.AsObject, valueValue);
+  dataType.GetField('Key').SetValue(objOut.AsObject, valueKey);
+  dataType.GetField('Value').SetValue(objOut.AsObject, valueValue);
 end;
 
 procedure DerTEnumerable(value: TJSONValue; dataType: TRttiType;
-  var obj: TValue; context: TDerContext);
+  var objOut: TValue; context: TDerContext);
 var
   jsonArray: TJSONArray;
 
@@ -680,6 +701,9 @@ begin
     raise EDJError.Create('Expected a JSON array. ' + context.ToString);
   end;
   jsonArray := value as TJSONArray;
+
+  // construct object
+  objOut := DerConstructObject(dataType, context);
 
   addMethod := dataType.GetMethod('Add');
   if addMethod = nil then
@@ -706,13 +730,13 @@ begin
     context.PopPath;
 
     // add the element value to the object
-    addMethod.Invoke(obj, [elementValue]);
+    addMethod.Invoke(objOut, [elementValue]);
   end;
 
 end;
 
 function DerHandledSpecialCase(value: TJSONValue; dataType: TRttiType;
-  var obj: TValue; context: TDerContext): Boolean;
+  var objOut: TValue; context: TDerContext): Boolean;
 var
   tmp: TRttiType;
 begin
@@ -722,28 +746,28 @@ begin
     if tmp.Name.StartsWith('TDictionary<string,', true) then
     begin
       Result := true;
-      DerTDictionaryStringKey(value, dataType, obj, context);
+      DerTDictionaryStringKey(value, dataType, objOut, context);
       exit;
     end;
 
     if tmp.Name.StartsWith('TDictionary<', true) then
     begin
       Result := true;
-      DerTDictionary(value, dataType, obj, context);
+      DerTDictionary(value, dataType, objOut, context);
       exit;
     end;
 
     if tmp.Name.StartsWith('TPair<', true) then
     begin
       Result := true;
-      DerTPair(value, dataType, obj, context);
+      DerTPair(value, dataType, objOut, context);
       exit;
     end;
 
     if tmp.Name.StartsWith('TEnumerable<', true) then
     begin
       Result := true;
-      DerTEnumerable(value, dataType, obj, context);
+      DerTEnumerable(value, dataType, objOut, context);
       exit;
     end;
 
@@ -756,7 +780,6 @@ end;
 function DerObject(value: TJSONValue; dataType: TRttiType;
   context: TDerContext): TValue;
 var
-  objType: TRttiInstanceType;
   objValue: TValue;
 
   jsonObject: TJSONObject;
@@ -773,17 +796,7 @@ var
 begin
 
   // create a new instance of the object
-
-  objType := dataType.AsInstance;
-
-  // TODO: find correct constructor (since create is not always supported with no arguments)
-  objValue := objType.GetMethod('Create').Invoke(objType.MetaclassType, []);
-
-  if DerHandledSpecialCase(value, dataType, objValue, context) then
-  begin
-    Result := objValue;
-    exit;
-  end;
+  objValue := DerConstructObject(dataType, context);
 
   // check if this is a json object
   if not(value is TJSONObject) then
@@ -869,6 +882,13 @@ function DeserializeInternal(value: TJSONValue; dataType: TRttiType;
 const
   typeMismatch = 'JSON value type does not match field type. ';
 begin
+
+  // handle special cases before
+  if DerHandledSpecialCase(value, dataType, Result, context) then
+  begin
+    exit;
+  end;
+
   if dataType.Handle^.Kind = TTypeKind.tkArray then
   begin
     if not(value is TJSONArray) then
