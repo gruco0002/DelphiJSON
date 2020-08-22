@@ -100,3 +100,6 @@ dunitx-results.xml
 *.fb7lck
 *.fbl7
 *.fbpInf
+
+# Debug folder
+**/Debug/*
