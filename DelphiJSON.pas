@@ -59,7 +59,7 @@ function DeserializeInternal(value: TJSONValue; dataType: TRttiType;
 implementation
 
 uses
-  System.TypInfo;
+  System.TypInfo, System.DateUtils;
 
 function SerArray(value: TValue; context: TSerContext): TJSONArray;
 var
@@ -236,6 +236,18 @@ begin
 
 end;
 
+function SerTDateTime(data: TValue; dataType: TRttiType; context: TSerContext)
+  : TJSONString;
+var
+  dt: TDateTime;
+  str: string;
+begin
+  dt := data.AsType<TDateTime>();
+  // TODO: add sth to handle timezones (and perhaps a setting in the context?)
+  str := DateToISO8601(dt);
+  Result := TJSONString.Create(str);
+end;
+
 function SerHandledSpecialCase(data: TValue; dataType: TRttiType;
   var output: TJSONValue; context: TSerContext): Boolean;
 var
@@ -244,6 +256,13 @@ begin
   tmp := dataType;
   while tmp <> nil do
   begin
+    if tmp.Name.ToLower = 'tdatetime' then
+    begin
+      Result := true;
+      output := SerTDateTime(data, dataType, context);
+      exit;
+    end;
+
     if tmp.Name.StartsWith('TDictionary<string,', true) then
     begin
       Result := true;
@@ -857,6 +876,27 @@ begin
 
 end;
 
+procedure DerTDateTime(value: TJSONValue; dataType: TRttiType;
+  var objOut: TValue; context: TDerContext);
+var
+  jStr: TJSONString;
+  str: string;
+  dt: TDateTime;
+begin
+
+  if not(value is TJSONString) then
+  begin
+    raise EDJError.Create('Expected a JSON string in date time format. ' +
+      context.ToString);
+  end;
+  jStr := value as TJSONString;
+  str := value.value;
+
+  // TODO: add sth to handle timezones (and perhaps a setting in the context?)
+  dt := ISO8601ToDate(str);
+  objOut := TValue.From(dt);
+end;
+
 function DerHandledSpecialCase(value: TJSONValue; dataType: TRttiType;
   var objOut: TValue; context: TDerContext): Boolean;
 var
@@ -865,6 +905,13 @@ begin
   tmp := dataType;
   while tmp <> nil do
   begin
+    if tmp.Name.ToLower = 'tdatetime' then
+    begin
+      Result := true;
+      DerTDateTime(value, dataType, objOut, context);
+      exit;
+    end;
+
     if tmp.Name.StartsWith('TDictionary<string,', true) then
     begin
       Result := true;
