@@ -17,11 +17,17 @@ type
 
     [Test]
     procedure BasicSerializeTest;
+
+    [Test]
+    procedure BasicDeserializeTest;
   end;
 
 implementation
 
 uses DelphiJSON, System.JSON, JSONComparer;
+
+const
+  notSerText = 'not (de)serialized';
 
 type
 
@@ -39,6 +45,8 @@ type
     [DJValue('int')]
     testInt: Integer;
 
+    constructor Create;
+
   end;
 
 procedure TBasicTests.Setup;
@@ -47,6 +55,24 @@ end;
 
 procedure TBasicTests.TearDown;
 begin
+end;
+
+procedure TBasicTests.BasicDeserializeTest;
+const
+  res = '{"textField": "testText1", "boolField": true, "int": 123}';
+var
+  tmp: TTestClass;
+begin
+
+  tmp := DelphiJSON<TTestClass>.Deserialize(res);
+
+  Assert.AreEqual('testText1', tmp.testText);
+  Assert.AreEqual(true, tmp.testBool);
+  Assert.AreEqual(123, tmp.testInt);
+  Assert.AreEqual(notSerText, tmp.testTextNotSer);
+
+  tmp.Free;
+
 end;
 
 procedure TBasicTests.BasicSerializeTest;
@@ -62,8 +88,7 @@ begin
 
   t := TTestClass.Create;
   t.testText := 'testText1';
-  t.testTextNotSer := 'do not serialize';
-  t.testBool := True;
+  t.testBool := true;
   t.testInt := 123;
 
   obj1 := DelphiJSON<TTestClass>.SerializeJ(t);
@@ -71,13 +96,20 @@ begin
 
   t.Free;
 
-  obj2 := TJSONObject.ParseJSONValue(res, false, True);
+  obj2 := TJSONObject.ParseJSONValue(res, false, true);
 
   Assert.IsTrue(JSONEquals(obj1, obj2));
 
   obj1.Free;
   obj2.Free;
 
+end;
+
+{ TTestClass }
+
+constructor TTestClass.Create;
+begin
+  testTextNotSer := notSerText;
 end;
 
 initialization
