@@ -39,7 +39,7 @@ type
     RTTI: TRttiContext;
 
     constructor Create;
-    destructor Destroy;
+    destructor Destroy; override;
 
     function FullPath: string;
     procedure PushPath(val: string); overload;
@@ -139,6 +139,8 @@ begin
     Inc(i);
   end;
 
+  enumerator.AsObject.Free;
+
 end;
 
 function SerTDictionaryStringKey(data: TObject; dataType: TRttiType;
@@ -197,6 +199,8 @@ begin
     moveNextValue := moveNext.Invoke(enumerator.AsObject, []);
     moveNextResult := moveNextValue.AsBoolean;
   end;
+
+  enumerator.AsObject.Free;
 
 end;
 

@@ -119,6 +119,7 @@ begin
 
   s := ser.ToJSON;
 
+  tmp.list.Free;
   tmp.Free;
 
   Assert.IsTrue(JSONEquals(ser, desired));
