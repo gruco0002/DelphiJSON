@@ -492,8 +492,48 @@ end;
 
 procedure DerTDictionaryStringKey(value: TJSONValue; dataType: TRttiType;
   var obj: TValue; context: TDerContext);
+var
+  jsonObject: TJSONObject;
+
+  addMethod: TRttiMethod;
+
+  jPair: TJSONPair;
+
+  valueKey: TValue;
+  typeKey: TRttiType;
+  valueValue: TValue;
+  typeValue: TRttiType;
+
+  i: Integer;
+
 begin
-  // TODO: implement
+  if not(value is TJSONObject) then
+  begin
+    raise EDJError.Create('Expected a JSON object. ' + context.ToString);
+  end;
+  jsonObject := value as TJSONObject;
+
+  // get the method that we will use to add into the dictionary
+  addMethod := dataType.GetMethod('AddOrSetValue');
+
+  // get the types of the key and value
+  typeKey := addMethod.GetParameters[0].ParamType; // this should be a string
+  typeValue := addMethod.GetParameters[1].ParamType;
+
+  for i := 0 to jsonObject.Count - 1 do
+  begin
+    jPair := jsonObject.Pairs[i];
+    valueKey := TValue.From<string>(jPair.JsonString.value);
+
+    // deserialize value
+    context.PushPath(jPair.JsonString.value);
+    valueValue := DeserializeInternal(jPair.JsonValue, typeValue, context);
+    context.PopPath;
+
+    // add the deserialized values to the dictionary
+    addMethod.Invoke(obj, [valueKey, valueValue]);
+
+  end;
 end;
 
 procedure DerTDictionary(value: TJSONValue; dataType: TRttiType;
@@ -507,7 +547,7 @@ var
   jArrObject: TJSONObject;
 
   jsonKey: TJSONValue;
-  jsonValue: TJSONValue;
+  JsonValue: TJSONValue;
   valueKey: TValue;
   typeKey: TRttiType;
   valueValue: TValue;
@@ -547,7 +587,7 @@ begin
         context.ToString);
     end;
 
-    jsonValue := jArrObject.GetValue('value');
+    JsonValue := jArrObject.GetValue('value');
     if jsonKey = nil then
     begin
       raise EDJError.Create('Expected a field with name "value". ' +
@@ -559,7 +599,7 @@ begin
     valueKey := DeserializeInternal(jsonKey, typeKey, context);
     context.PopPath;
     context.PushPath('value');
-    valueValue := DeserializeInternal(jsonValue, typeValue, context);
+    valueValue := DeserializeInternal(JsonValue, typeValue, context);
     context.PopPath;
 
     // add the deserialized values to the dictionary
@@ -576,7 +616,7 @@ procedure DerTPair(value: TJSONValue; dataType: TRttiType; var obj: TValue;
 var
   jsonObject: TJSONObject;
   jsonKey: TJSONValue;
-  jsonValue: TJSONValue;
+  JsonValue: TJSONValue;
 
   typeKey: TRttiType;
   typeValue: TRttiType;
@@ -597,7 +637,7 @@ begin
       context.ToString);
   end;
 
-  jsonValue := jsonObject.GetValue('value');
+  JsonValue := jsonObject.GetValue('value');
   if jsonKey = nil then
   begin
     raise EDJError.Create('Expected a field with name "value". ' +
@@ -611,7 +651,7 @@ begin
   valueKey := DeserializeInternal(jsonKey, typeKey, context);
   context.PopPath;
   context.PushPath('value');
-  valueValue := DeserializeInternal(jsonValue, typeValue, context);
+  valueValue := DeserializeInternal(JsonValue, typeValue, context);
   context.PopPath;
 
   // apply the values to the object
@@ -627,7 +667,7 @@ var
   addMethod: TRttiMethod;
   ElementType: TRttiType;
 
-  jsonValue: TJSONValue;
+  JsonValue: TJSONValue;
   i: Integer;
   elementValue: TValue;
 
@@ -657,9 +697,9 @@ begin
   for i := 0 to jsonArray.Count - 1 do
   begin
 
-    jsonValue := jsonArray.Items[i];
+    JsonValue := jsonArray.Items[i];
     context.PushPath(i.ToString);
-    elementValue := DeserializeInternal(jsonValue, ElementType, context);
+    elementValue := DeserializeInternal(JsonValue, ElementType, context);
     context.PopPath;
 
     // add the element value to the object
@@ -724,7 +764,7 @@ var
   objectFields: TArray<TRttiField>;
   field: TRttiField;
   jsonFieldName: string;
-  jsonValue: TJSONValue;
+  JsonValue: TJSONValue;
 
   fieldValue: TValue;
 begin
@@ -796,8 +836,8 @@ begin
 
     // check if the field name exists in the json structure
 
-    jsonValue := jsonObject.GetValue(jsonFieldName);
-    if jsonValue = nil then
+    JsonValue := jsonObject.GetValue(jsonFieldName);
+    if JsonValue = nil then
     begin
       raise EDJError.Create('Value with name "' + jsonFieldName +
         '" missing in JSON data. ' + context.ToString);
@@ -806,7 +846,7 @@ begin
     // TODO: Add possibilities for converters here
 
     context.PushPath(jsonFieldName);
-    fieldValue := DeserializeInternal(jsonValue, field.FieldType, context);
+    fieldValue := DeserializeInternal(JsonValue, field.FieldType, context);
     context.PopPath;
 
     // set the value in the resulting object
@@ -952,11 +992,11 @@ end;
 
 class function DelphiJSON<T>.Serialize(data: T): string;
 var
-  jsonValue: TJSONValue;
+  JsonValue: TJSONValue;
 begin
-  jsonValue := SerializeJ(data);
-  Result := jsonValue.ToJSON;
-  jsonValue.Free;
+  JsonValue := SerializeJ(data);
+  Result := JsonValue.ToJSON;
+  JsonValue.Free;
 end;
 
 class function DelphiJSON<T>.SerializeJ(data: T): TJSONValue;
