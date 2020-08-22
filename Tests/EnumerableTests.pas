@@ -24,6 +24,9 @@ type
     [Test]
     procedure TestListDeserialization;
 
+    [Test]
+    procedure TestDictDeserialization;
+
   end;
 
 implementation
@@ -61,6 +64,32 @@ end;
 
 procedure TEnumerableTests.TearDown;
 begin
+end;
+
+procedure TEnumerableTests.TestDictDeserialization;
+const
+  res = '{"field":125, "data":[{"key":5, "value":"five"}, {"key":3, "value":"three"}, {"key":2, "value":"two"}, {"key":7, "value":"seven"}, {"key":11, "value":"eleven"}]}';
+var
+  tmp: TTest2;
+begin
+
+  tmp := DelphiJSON<TTest2>.Deserialize(res);
+
+  Assert.AreEqual(125, tmp.field);
+  Assert.AreEqual(5, tmp.data.Count);
+  Assert.IsTrue(tmp.data.ContainsKey(5));
+  Assert.AreEqual('five', tmp.data[5]);
+  Assert.AreEqual('eleven', tmp.data[11]);
+  Assert.AreEqual('three', tmp.data[3]);
+  Assert.AreEqual('two', tmp.data[2]);
+  Assert.AreEqual('seven', tmp.data[7]);
+  Assert.IsFalse(tmp.data.ContainsKey(1));
+
+
+  tmp.data.Free;
+  tmp.Free;
+
+
 end;
 
 procedure TEnumerableTests.TestDictSerialization;

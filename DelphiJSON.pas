@@ -58,6 +58,9 @@ function DeserializeInternal(value: TJSONValue; dataType: TRttiType;
 
 implementation
 
+uses
+  System.TypInfo;
+
 function SerArray(value: TValue; context: TSerContext): TJSONArray;
 var
   size: Integer;
@@ -411,9 +414,39 @@ begin
   end;
 end;
 
+function DerSpecialConstructors(dataType: TRttiType; method: TRttiMethod;
+  var params: TArray<TValue>): Boolean;
+begin
+  Result := False;
+
+  // special case dictionary constructor
+  if dataType.Name.ToLower.StartsWith('tdictionary<') then
+  begin
+    if Length(method.GetParameters) = 1 then
+    begin
+      if method.GetParameters[0].Name.ToLower = 'acapacity' then
+      begin
+        Result := true;
+        SetLength(params, 1);
+        params[0] := TValue.From(0);
+        exit;
+      end;
+    end;
+  end;
+end;
+
 function DerConstructObject(dataType: TRttiType; context: TDerContext): TValue;
 var
   objType: TRttiInstanceType;
+  method: TRttiMethod;
+  selectedMethod: TRttiMethod;
+
+  tmp: TRttiParameter;
+  counter: Integer;
+
+  BaseType: TRttiType;
+
+  params: TArray<TValue>;
 begin
   objType := dataType.AsInstance;
 
@@ -424,7 +457,74 @@ begin
   // 3. Error Message
   // an alternative to that would be a way to create the object without the use of a constructor (if this is possible)
 
-  Result := objType.GetMethod('Create').Invoke(objType.MetaclassType, []);
+  selectedMethod := nil;
+
+  SetLength(params, 0);
+
+  for method in objType.GetMethods do
+  begin
+
+    if not method.IsConstructor then
+    begin
+      continue;
+    end;
+
+    // this is used to handle special cases of the standard library
+    if DerSpecialConstructors(dataType, method, params) then
+    begin
+      selectedMethod := method;
+      continue;
+    end;
+
+    if not(method.Visibility in [TMemberVisibility.mvPublished,
+      TMemberVisibility.mvPublic]) then
+    begin
+      continue;
+    end;
+
+    counter := 0;
+    for tmp in method.GetParameters do
+    begin
+      // TODO: check if a default value is set
+      Inc(counter);
+    end;
+    if counter <> 0 then
+    begin
+      continue;
+    end;
+
+    if method.Name.ToLower <> 'create' then
+    begin
+      continue;
+    end;
+
+    if selectedMethod <> nil then
+    begin
+      BaseType := method.Parent;
+      while BaseType <> nil do
+      begin
+        if BaseType = selectedMethod.Parent then
+        begin
+          // the selected constructor is from a base class, hence choose the current "higher" constructor
+          selectedMethod := method;
+        end;
+        BaseType := BaseType.BaseType;
+      end;
+    end
+    else
+    begin
+      selectedMethod := method;
+    end;
+
+  end;
+
+  if selectedMethod = nil then
+  begin
+    raise EDJError.Create('Did not find a suitable constructor for type. ' +
+      context.ToString);
+  end;
+
+  Result := selectedMethod.Invoke(objType.MetaclassType, params);
 
 end;
 
