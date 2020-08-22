@@ -271,9 +271,10 @@ begin
   Result := False;
 end;
 
-function SerObject(value: TValue; context: TSerContext): TJSONValue;
+function SerObject(value: TValue; context: TSerContext; isRecord: Boolean)
+  : TJSONValue;
 var
-  data: TObject;
+  // data: TObject;
   dataType: TRttiType;
   attribute: TCustomAttribute;
   found: Boolean;
@@ -288,9 +289,7 @@ var
   tmp: TJSONValue;
 begin
 
-  data := value.AsObject;
-
-  dataType := context.RTTI.GetType(data.ClassInfo);
+  dataType := context.RTTI.GetType(value.TypeInfo);
 
   // TODO: split this function in smaller parts
 
@@ -347,7 +346,15 @@ begin
     end;
 
     // TODO: Add possibilities for converters here
-    fieldValue := field.GetValue(data);
+
+    if isRecord then
+    begin
+      fieldValue := field.GetValue(value.GetReferenceToRawData);
+    end
+    else
+    begin
+      fieldValue := field.GetValue(value.AsObject);
+    end;
 
     context.PushPath(jsonFieldName);
     serializedField := SerializeInternal(fieldValue, context);
@@ -405,7 +412,11 @@ begin
   end
   else if value.IsObject then
   begin
-    Result := SerObject(value, context);
+    Result := SerObject(value, context, False);
+  end
+  else if value.Kind = TTypeKind.tkRecord then
+  begin
+    Result := SerObject(value, context, true);
   end
   else
   begin
