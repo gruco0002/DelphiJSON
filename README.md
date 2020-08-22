@@ -1,6 +1,8 @@
 # DelphiJSON
 An explicit and configurable single file JSON library for Delphi that is based on attributes and RTTI.
 
+![DelphiJSONLogo](https://github.com/gruco0002/DelphiJSON/blob/master/Logo/Logo_small.png?raw=true)
+
 The library is based on Delphis `System.RTTI` and `System.JSON` and has no non-standard dependencies.
 The test framework used to develop and test the library is `DUnitX`, but it is not required if you just want to use the library.
 
