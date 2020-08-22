@@ -200,7 +200,7 @@ begin
 
 end;
 
-function SerTPair(data: TObject; dataType: TRttiType; context: TSerContext)
+function SerTPair(data: TValue; dataType: TRttiType; context: TSerContext)
   : TJSONObject;
 var
   keyField: TRttiField;
@@ -213,8 +213,8 @@ begin
   keyField := dataType.GetField('Key');
   valueField := dataType.GetField('Value');
 
-  keyValue := keyField.GetValue(data);
-  valueValue := valueField.GetValue(data);
+  keyValue := keyField.GetValue(data.GetReferenceToRawData);
+  valueValue := valueField.GetValue(data.GetReferenceToRawData);
 
   context.PushPath('key');
   serializedKey := SerializeInternal(keyValue, context);
@@ -229,7 +229,7 @@ begin
 
 end;
 
-function SerHandledSpecialCase(data: TObject; dataType: TRttiType;
+function SerHandledSpecialCase(data: TValue; dataType: TRttiType;
   var output: TJSONValue; context: TSerContext): Boolean;
 var
   tmp: TRttiType;
@@ -240,7 +240,7 @@ begin
     if tmp.Name.StartsWith('TDictionary<string,', true) then
     begin
       Result := true;
-      output := SerTDictionaryStringKey(data, dataType, context);
+      output := SerTDictionaryStringKey(data.AsObject, dataType, context);
       exit;
     end;
 
@@ -254,7 +254,7 @@ begin
     if tmp.Name.StartsWith('TEnumerable<', true) then
     begin
       Result := true;
-      output := SerTEnumerable(data, dataType, context);
+      output := SerTEnumerable(data.AsObject, dataType, context);
       exit;
     end;
 
@@ -284,12 +284,6 @@ begin
   data := value.AsObject;
 
   dataType := context.RTTI.GetType(data.ClassInfo);
-
-  // checking if a special case handled the type of data
-  if SerHandledSpecialCase(data, dataType, Result, context) then
-  begin
-    exit;
-  end;
 
   // TODO: split this function in smaller parts
 
@@ -360,11 +354,20 @@ begin
 end;
 
 function SerializeInternal(value: TValue; context: TSerContext): TJSONValue;
+var
+  dataType: TRttiType;
 begin
   // check for the type and call the appropriate subroutine for serialization
 
-  // TODO: special handling for TDateTime and other cases
+  dataType := context.RTTI.GetType(value.TypeInfo);
+  
+  // checking if a special case handled the type of data
+  if SerHandledSpecialCase(value, dataType, Result, context) then
+  begin
+    exit;
+  end;
 
+  // handle other cases
   if value.IsArray then
   begin
     Result := SerArray(value, context);

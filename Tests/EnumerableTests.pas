@@ -18,6 +18,9 @@ type
     [Test]
     procedure TestList;
 
+    [Test]
+    procedure TestDict;
+
   end;
 
 implementation
@@ -38,12 +41,59 @@ type
 
   end;
 
+  [DJSerializable]
+  TTest2 = class
+
+  [DJValue('field')]
+    field: integer;
+
+    [DJValue('data')]
+    data: TDictionary<integer, string>;
+
+  end;
+
 procedure TEnumerableTests.Setup;
 begin
 end;
 
 procedure TEnumerableTests.TearDown;
 begin
+end;
+
+procedure TEnumerableTests.TestDict;
+const
+  res = '{"field":123, "data":[{"key":5, "value":"five"}, {"key":3, "value":"three"}, {"key":2, "value":"two"}, {"key":7, "value":"seven"}, {"key":11, "value":"eleven"}]}';
+var
+  tmp: TTest2;
+  desired: TJSONValue;
+  ser: TJSONValue;
+  s: string;
+begin
+
+  tmp := TTest2.Create;
+  tmp.field := 123;
+  tmp.data := TDictionary<integer, string>.Create;
+
+  tmp.data.Add(5, 'five');
+  tmp.data.Add(3, 'three');
+  tmp.data.Add(2, 'two');
+  tmp.data.Add(7, 'seven');
+  tmp.data.Add(11, 'eleven');
+
+  ser := DelphiJSON<TTest2>.SerializeJ(tmp);
+
+  s := ser.ToJSON;
+
+  tmp.data.Free;
+  tmp.Free;
+
+  desired := TJSONObject.ParseJSONValue(res, false, True);
+
+  Assert.IsTrue(JSONEquals(ser, desired, false));
+
+  desired.Free;
+  ser.Free;
+
 end;
 
 procedure TEnumerableTests.TestList;

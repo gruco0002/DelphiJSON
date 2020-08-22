@@ -4,11 +4,16 @@ interface
 
 uses System.JSON;
 
-function JSONEquals(value1: TJSONValue; value2: TJSONValue): Boolean;
+function JSONEquals(value1: TJSONValue; value2: TJSONValue;
+  strictArrayOrder: Boolean = true): Boolean;
 
 implementation
 
-function CmpObject(value1: TJSONObject; value2: TJSONObject): Boolean;
+uses
+  System.Generics.Collections;
+
+function CmpObject(value1: TJSONObject; value2: TJSONObject;
+  strictArrayOrder: Boolean): Boolean;
 var
   p: TJSONPair;
   val: TJSONValue;
@@ -33,7 +38,7 @@ begin
       exit;
     end;
 
-    if not JSONEquals(p.JsonValue, val) then
+    if not JSONEquals(p.JsonValue, val, strictArrayOrder) then
     begin
       Result := false;
       exit;
@@ -45,7 +50,8 @@ begin
 
 end;
 
-function CmpArray(value1: TJSONArray; value2: TJSONArray): Boolean;
+function CmpArray(value1: TJSONArray; value2: TJSONArray;
+  strictArrayOrder: Boolean): Boolean;
 var
   i: integer;
 begin
@@ -57,7 +63,7 @@ begin
 
   for i := 0 to value1.Count - 1 do
   begin
-    if not JSONEquals(value1.Items[i], value2.Items[i]) then
+    if not JSONEquals(value1.Items[i], value2.Items[i], strictArrayOrder) then
     begin
       Result := false;
       exit;
@@ -67,17 +73,77 @@ begin
   Result := true;
 end;
 
-function JSONEquals(value1: TJSONValue; value2: TJSONValue): Boolean;
+function CmpArrayInvariantOrder(value1: TJSONArray; value2: TJSONArray;
+  strictArrayOrder: Boolean): Boolean;
+var
+  i: integer;
+  j: integer;
+  used: TList<Boolean>;
+  found: Boolean;
+begin
+  if value1.Count <> value2.Count then
+  begin
+    Result := false;
+    exit;
+  end;
+
+  used := TList<Boolean>.Create;
+  for i := 0 to value2.Count - 1 do
+  begin
+    used.Add(false);
+  end;
+
+  for i := 0 to value1.Count - 1 do
+  begin
+    found := false;
+    for j := 0 to value2.Count - 1 do
+    begin
+      if JSONEquals(value1.Items[i], value2.Items[j], strictArrayOrder) and
+        (not used[j]) then
+      begin
+        used[j] := true;
+        found := true;
+        break;
+      end;
+    end;
+
+    if not found then
+    begin
+      Result := false;
+      used.Free;
+      used := nil;
+      exit;
+    end;
+
+  end;
+
+  used.Free;
+  used := nil;
+  Result := true;
+end;
+
+function JSONEquals(value1: TJSONValue; value2: TJSONValue;
+  strictArrayOrder: Boolean): Boolean;
 begin
   Result := false;
 
   if (value1 is TJSONObject) and (value2 is TJSONObject) then
   begin
-    Result := CmpObject(value1 as TJSONObject, value2 as TJSONObject);
+    Result := CmpObject(value1 as TJSONObject, value2 as TJSONObject,
+      strictArrayOrder);
   end
   else if (value1 is TJSONArray) and (value2 is TJSONArray) then
   begin
-    Result := CmpArray(value1 as TJSONArray, value2 as TJSONArray);
+    if strictArrayOrder then
+    begin
+      Result := CmpArray(value1 as TJSONArray, value2 as TJSONArray,
+        strictArrayOrder);
+    end
+    else
+    begin
+      Result := CmpArrayInvariantOrder(value1 as TJSONArray,
+        value2 as TJSONArray, strictArrayOrder);
+    end;
   end
   else if (value1 is TJSONBool) and (value2 is TJSONBool) then
   begin
