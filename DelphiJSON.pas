@@ -414,7 +414,14 @@ begin
   objType := dataType.AsInstance;
 
   // TODO: find correct constructor (since create is not always supported with no arguments)
+  // idea: Iterate over all constructors of the instance and choose a fitting one by the following priority:
+  // 1. one tagged with an (yet to introduce) attribute
+  // 2. Create (if it does not need any arguments)
+  // 3. Error Message
+  // an alternative to that would be a way to create the object without the use of a constructor (if this is possible)
+
   Result := objType.GetMethod('Create').Invoke(objType.MetaclassType, []);
+
 end;
 
 function DerArray(value: TJSONArray; dataType: TRttiType;
