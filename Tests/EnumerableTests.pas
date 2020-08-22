@@ -16,10 +16,13 @@ type
     procedure TearDown;
 
     [Test]
-    procedure TestList;
+    procedure TestListSerialization;
 
     [Test]
-    procedure TestDict;
+    procedure TestDictSerialization;
+
+    [Test]
+    procedure TestListDeserialization;
 
   end;
 
@@ -60,7 +63,7 @@ procedure TEnumerableTests.TearDown;
 begin
 end;
 
-procedure TEnumerableTests.TestDict;
+procedure TEnumerableTests.TestDictSerialization;
 const
   res = '{"field":123, "data":[{"key":5, "value":"five"}, {"key":3, "value":"three"}, {"key":2, "value":"two"}, {"key":7, "value":"seven"}, {"key":11, "value":"eleven"}]}';
 var
@@ -96,7 +99,27 @@ begin
 
 end;
 
-procedure TEnumerableTests.TestList;
+procedure TEnumerableTests.TestListDeserialization;
+const
+  res = '{"field":123, "intList":[12, 13, 42]}';
+var
+  Test: TTest;
+begin
+
+  Test := DelphiJSON<TTest>.Deserialize(res);
+
+  Assert.AreEqual(123, Test.field);
+
+  Assert.AreEqual(3, Test.list.Count);
+  Assert.AreEqual(12, Test.list[0]);
+  Assert.AreEqual(13, Test.list[1]);
+  Assert.AreEqual(42, Test.list[2]);
+
+  Test.list.Free;
+  Test.Free;
+end;
+
+procedure TEnumerableTests.TestListSerialization;
 const
   res = '{"field":123, "intList":[12, 13, 42]}';
 var
