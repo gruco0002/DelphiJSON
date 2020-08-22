@@ -17,7 +17,8 @@ uses
   JSONComparer in 'JSONComparer.pas',
   JSONComparerTests in 'JSONComparerTests.pas',
   EnumerableTests in 'EnumerableTests.pas',
-  RecordTests in 'RecordTests.pas';
+  RecordTests in 'RecordTests.pas',
+  DateAndTimeTests in 'DateAndTimeTests.pas';
 
 var
   runner: ITestRunner;
