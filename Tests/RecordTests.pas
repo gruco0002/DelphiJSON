@@ -14,6 +14,9 @@ type
     [Test]
     procedure SerializationTest;
 
+    [Test]
+    procedure DeserializeTest;
+
   end;
 
 implementation
@@ -37,6 +40,24 @@ type
   end;
 
   { TRecordTests }
+
+procedure TRecordTests.DeserializeTest;
+const
+  res = '{"text":"abc", "int":42, "bool":true}';
+var
+  tmp: TTestRec;
+begin
+  tmp.data := 'absdfgfc';
+  tmp.number := 4245;
+  tmp.statement := false;
+
+  tmp := DelphiJSON<TTestRec>.Deserialize(res);
+
+  Assert.AreEqual('abc', tmp.data);
+  Assert.AreEqual(42, tmp.number);
+  Assert.AreEqual(true, tmp.statement);
+
+end;
 
 procedure TRecordTests.SerializationTest;
 const

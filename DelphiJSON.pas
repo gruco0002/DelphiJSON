@@ -899,8 +899,8 @@ begin
   Result := False;
 end;
 
-function DerObject(value: TJSONValue; dataType: TRttiType;
-  context: TDerContext): TValue;
+function DerObject(value: TJSONValue; dataType: TRttiType; context: TDerContext;
+  isRecord: Boolean): TValue;
 var
   objValue: TValue;
 
@@ -917,8 +917,16 @@ var
   fieldValue: TValue;
 begin
 
-  // create a new instance of the object
-  objValue := DerConstructObject(dataType, context);
+  if isRecord then
+  begin
+    // create a record value
+    TValue.Make(nil, dataType.Handle, objValue);
+  end
+  else
+  begin
+    // create a new instance of the object
+    objValue := DerConstructObject(dataType, context);
+  end;
 
   // check if this is a json object
   if not(value is TJSONObject) then
@@ -991,7 +999,14 @@ begin
     context.PopPath;
 
     // set the value in the resulting object
-    field.SetValue(objValue.AsObject, fieldValue);
+    if isRecord then
+    begin
+      field.SetValue(objValue.GetReferenceToRawData, fieldValue);
+    end
+    else
+    begin
+      field.SetValue(objValue.AsObject, fieldValue);
+    end;
 
   end;
 
@@ -1097,10 +1112,29 @@ begin
     begin
       Result := TValue.From<TObject>(nil);
     end
+    else if not(value is TJSONObject) then
+    begin
+      raise EDJError.Create(typeMismatch + context.ToString);
+    end
     else
     begin
-      Result := DerObject(value as TJSONObject, dataType, context);
+      Result := DerObject(value as TJSONObject, dataType, context, False);
     end;
+  end
+  else if dataType.Handle^.Kind = TTypeKind.tkRecord then
+  begin
+    if value is TJSONNull then
+    begin
+      raise EDJError.Create('Record type can not be null. ' + context.ToString);
+    end;
+
+    if not(value is TJSONObject) then
+    begin
+      raise EDJError.Create(typeMismatch + context.ToString);
+    end;
+
+    Result := DerObject(value as TJSONObject, dataType, context, true);
+
   end
   else
   begin
