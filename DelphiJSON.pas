@@ -770,7 +770,10 @@ var
 begin
 
   // create a new instance of the object
+
   objType := dataType.AsInstance;
+
+  // TODO: find correct constructor (since create is not always supported with no arguments)
   objValue := objType.GetMethod('Create').Invoke(objType.MetaclassType, []);
 
   if DerHandledSpecialCase(value, dataType, objValue, context) then
