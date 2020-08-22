@@ -42,7 +42,8 @@ type
     destructor Destroy;
 
     function FullPath: string;
-    procedure PushPath(val: string);
+    procedure PushPath(val: string); overload;
+    procedure PushPath(index: Integer); overload;
     procedure PopPath;
 
     function ToString: string;
@@ -59,8 +60,8 @@ implementation
 
 function SerArray(value: TValue; context: TSerContext): TJSONArray;
 var
-  size: integer;
-  i: integer;
+  size: Integer;
+  i: Integer;
 begin
   Result := TJSONArray.Create;
   size := value.GetArrayLength;
@@ -103,7 +104,7 @@ var
   currentSerialized: TJSONValue;
   moveNextValue: TValue;
   moveNextResult: Boolean;
-  i: integer;
+  i: Integer;
 begin
   // idea: fetch enumerator with rtti, enumerate using movenext, adding objects
   // to the array
@@ -408,7 +409,7 @@ function DerArray(value: TJSONArray; dataType: TRttiType;
 var
   res: array of TValue;
   valueType: TRttiType;
-  i: integer;
+  i: Integer;
   staticType: TRttiArrayType;
 begin
   if dataType.Handle^.Kind = TTypeKind.tkDynArray then
@@ -452,7 +453,7 @@ function DerNumber(value: TJSONNumber; dataType: TRttiType;
 var
   valFloat: Double;
   valInt64: Int64;
-  valInt: integer;
+  valInt: Integer;
 begin
   if dataType.Handle^.Kind = TTypeKind.tkFloat then
   begin
@@ -501,15 +502,72 @@ var
   jsonArray: TJSONArray;
 
   addMethod: TRttiMethod;
+
+  jArrValue: TJSONValue;
+  jArrObject: TJSONObject;
+
+  jsonKey: TJSONValue;
+  jsonValue: TJSONValue;
+  valueKey: TValue;
+  typeKey: TRttiType;
+  valueValue: TValue;
+  typeValue: TRttiType;
+
+  i: Integer;
 begin
-  // TODO: implement
   if not(value is TJSONArray) then
   begin
     raise EDJError.Create('Expected a JSON array. ' + context.ToString);
   end;
   jsonArray := value as TJSONArray;
 
+  // get the method that we will use to add into the dictionary
   addMethod := dataType.GetMethod('AddOrSetValue');
+
+  // get the types of the key and value
+  typeKey := addMethod.GetParameters[0].ParamType;
+  typeValue := addMethod.GetParameters[1].ParamType;
+
+  for i := 0 to jsonArray.Count - 1 do
+  begin
+    context.PushPath(i);
+    jArrValue := jsonArray.Items[i];
+
+    // split up array entry into key and value and check if this went fine
+    if not(jArrValue is TJSONObject) then
+    begin
+      raise EDJError.Create('Expected a JSON object. ' + context.ToString);
+    end;
+    jArrObject := jArrValue as TJSONObject;
+
+    jsonKey := jArrObject.GetValue('key');
+    if jsonKey = nil then
+    begin
+      raise EDJError.Create('Expected a field with name "key". ' +
+        context.ToString);
+    end;
+
+    jsonValue := jArrObject.GetValue('value');
+    if jsonKey = nil then
+    begin
+      raise EDJError.Create('Expected a field with name "value". ' +
+        context.ToString);
+    end;
+
+    // deserialize key and value
+    context.PushPath('key');
+    valueKey := DeserializeInternal(jsonKey, typeKey, context);
+    context.PopPath;
+    context.PushPath('value');
+    valueValue := DeserializeInternal(jsonValue, typeValue, context);
+    context.PopPath;
+
+    // add the deserialized values to the dictionary
+    addMethod.Invoke(obj, [valueKey, valueValue]);
+
+    context.PopPath;
+
+  end;
 
 end;
 
@@ -570,7 +628,7 @@ var
   ElementType: TRttiType;
 
   jsonValue: TJSONValue;
-  i: integer;
+  i: Integer;
   elementValue: TValue;
 
 begin
@@ -947,6 +1005,11 @@ end;
 procedure TSerContext.PopPath;
 begin
   path.Pop;
+end;
+
+procedure TSerContext.PushPath(index: Integer);
+begin
+  path.Push(index.ToString);
 end;
 
 procedure TSerContext.PushPath(val: string);
