@@ -12,6 +12,7 @@ type
 
     RequireSerializableAttributeForNonRTLClasses: Boolean;
     DateTimeReturnUTC: Boolean;
+    IgnoreNonNillable: Boolean;
 
     constructor Default;
 
@@ -39,7 +40,9 @@ type
   end;
 
   DJSerializableAttribute = class(TCustomAttribute)
+  end;
 
+  DJNonNilableAttribute = class(TCustomAttribute)
   end;
 
   EDJError = class(Exception);
@@ -318,6 +321,8 @@ var
   fieldValue: TValue;
   serializedField: TJSONValue;
   tmp: TJSONValue;
+
+  nillable: Boolean;
 begin
 
   dataType := context.RTTI.GetType(value.TypeInfo);
@@ -354,16 +359,28 @@ begin
   objectFields := dataType.GetFields;
   for field in objectFields do
   begin
-    // check for the jsonValue parameter
+    // check for the attributes
     found := False;
+    nillable := true;
     for attribute in field.GetAttributes() do
     begin
       if attribute is DJValueAttribute then
       begin
+        // found the value attribute (this needs to be serialized)
         found := true;
         jsonFieldName := (attribute as DJValueAttribute).Name.Trim;
-        break;
+      end
+      else if attribute is DJNonNilableAttribute then
+      begin
+        // nil is not allowed
+        nillable := False;
       end;
+    end;
+
+    // check if nillable is allowed
+    if context.settings.IgnoreNonNillable then
+    begin
+      nillable := true;
     end;
 
     if not found then
@@ -391,6 +408,18 @@ begin
     end;
 
     context.PushPath(jsonFieldName);
+
+    // check if field is nil
+    if fieldValue.IsObject then
+    begin
+      if (not nillable) and (fieldValue.AsObject = nil) then
+      begin
+        raise EDJError.Create('Field value must not be nil, but was nil. ' +
+          context.ToString);
+      end;
+    end;
+
+    // serialize
     serializedField := SerializeInternal(fieldValue, context);
     context.PopPath;
 
@@ -975,6 +1004,8 @@ var
   JsonValue: TJSONValue;
 
   fieldValue: TValue;
+
+  nillable: Boolean;
 begin
 
   if isRecord then
@@ -1021,16 +1052,28 @@ begin
   objectFields := dataType.GetFields;
   for field in objectFields do
   begin
-    // check for the jsonValue parameter
+    // check for the attributes
     found := False;
+    nillable := true;
     for attribute in field.GetAttributes() do
     begin
       if attribute is DJValueAttribute then
       begin
+        // found the value attribute (this needs to be serialized)
         found := true;
         jsonFieldName := (attribute as DJValueAttribute).Name.Trim;
-        break;
+      end
+      else if attribute is DJNonNilableAttribute then
+      begin
+        // nil is not allowed
+        nillable := False;
       end;
+    end;
+
+    // check if nillable is allowed
+    if context.settings.IgnoreNonNillable then
+    begin
+      nillable := true;
     end;
 
     if not found then
@@ -1058,6 +1101,13 @@ begin
     // TODO: Add possibilities for converters here
 
     context.PushPath(jsonFieldName);
+
+    if (not nillable) and (JsonValue is TJSONNull) then
+    begin
+      raise EDJError.Create('Field value must not be nil, but JSON was null. ' +
+        context.ToString);
+    end;
+
     fieldValue := DeserializeInternal(JsonValue, field.FieldType, context);
     context.PopPath;
 
@@ -1336,6 +1386,7 @@ constructor TDJSettings.Default;
 begin
   RequireSerializableAttributeForNonRTLClasses := true;
   DateTimeReturnUTC := true;
+  IgnoreNonNillable := False;
 end;
 
 end.
