@@ -129,7 +129,7 @@ end;
 function SerString(value: TValue; context: TSerContext): TJSONString;
 begin
   Result := TJSONString.Create(value.AsString);
-  context.AddHeapObject(result);
+  context.AddHeapObject(Result);
 end;
 
 function SerTEnumerable(data: TObject; dataType: TRttiType;
@@ -1331,8 +1331,17 @@ class function DelphiJSON<T>.Deserialize(data: String;
 var
   val: TJSONValue;
 begin
-  val := TJSONObject.ParseJSONValue(data, true, true);
-  Result := DeserializeJ(val, settings);
+  val := nil;
+  try
+    val := TJSONObject.ParseJSONValue(data, true, true);
+    Result := DeserializeJ(val, settings);
+  except
+    on e: EDJError do
+    begin
+      val.Free;
+      raise e;
+    end;
+  end;
   val.Free;
 end;
 
@@ -1353,8 +1362,20 @@ begin
 
   context := TDerContext.Create;
   context.settings := settings;
-  rttiType := context.RTTI.GetType(System.TypeInfo(T));
-  res := DeserializeInternal(data, rttiType, context);
+
+  try
+    rttiType := context.RTTI.GetType(System.TypeInfo(T));
+    res := DeserializeInternal(data, rttiType, context);
+  except
+    on e: EDJError do
+    begin
+      context.FreeAllHeapObjects;
+      context.Free;
+      createdSettings.Free;
+      raise e;
+    end;
+  end;
+
   context.Free;
   createdSettings.Free;
   Result := res.AsType<T>();
@@ -1364,8 +1385,17 @@ class function DelphiJSON<T>.Serialize(data: T; settings: TDJSettings): string;
 var
   JsonValue: TJSONValue;
 begin
-  JsonValue := SerializeJ(data, settings);
-  Result := JsonValue.ToJSON;
+  JsonValue := nil;
+  try
+    JsonValue := SerializeJ(data, settings);
+    Result := JsonValue.ToJSON;
+  except
+    on e: EDJError do
+    begin
+      JsonValue.Free;
+      raise e;
+    end;
+  end;
   JsonValue.Free;
 end;
 
@@ -1385,8 +1415,20 @@ begin
 
   context := TSerContext.Create;
   context.settings := settings;
-  valueObject := TValue.From<T>(data);
-  Result := SerializeInternal(valueObject, context);
+
+  try
+    valueObject := TValue.From<T>(data);
+    Result := SerializeInternal(valueObject, context);
+  except
+    on e: EDJError do
+    begin
+      context.FreeAllHeapObjects;
+      context.Free;
+      createdSettings.Free;
+      raise e;
+    end;
+  end;
+
   context.Free;
   createdSettings.Free;
 end;
