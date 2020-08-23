@@ -10,6 +10,8 @@ type
   TDJSettings = class
   public
 
+    RequireSerializableAttributeForNonRTLClasses: Boolean;
+
     constructor Default;
 
   end;
@@ -324,21 +326,24 @@ begin
 
   // handle a "standard" object and serialize it
 
-  // Ensure the object has the serializable attribute. (Fields added later)
-  found := False;
-  for attribute in dataType.GetAttributes() do
+  if context.settings.RequireSerializableAttributeForNonRTLClasses then
   begin
-    if attribute is DJSerializableAttribute then
+    // Ensure the object has the serializable attribute. (Fields added later)
+    found := False;
+    for attribute in dataType.GetAttributes() do
     begin
-      found := true;
-      break;
+      if attribute is DJSerializableAttribute then
+      begin
+        found := true;
+        break;
+      end;
     end;
-  end;
-  if not found then
-  begin
-    raise EDJError.Create
-      ('Given object type is missing the JSONSerializable attribute. ' +
-      context.ToString);
+    if not found then
+    begin
+      raise EDJError.Create
+        ('Given object type is missing the JSONSerializable attribute. ' +
+        context.ToString);
+    end;
   end;
 
   // Init the result object
@@ -994,21 +999,24 @@ begin
 
   // handle a "standard" object and deserialize it
 
-  // Ensure the object has the serializable attribute. (Fields added later)
-  found := False;
-  for attribute in dataType.GetAttributes() do
+  if context.settings.RequireSerializableAttributeForNonRTLClasses then
   begin
-    if attribute is DJSerializableAttribute then
+    // Ensure the object has the serializable attribute. (Fields added later)
+    found := False;
+    for attribute in dataType.GetAttributes() do
     begin
-      found := true;
-      break;
+      if attribute is DJSerializableAttribute then
+      begin
+        found := true;
+        break;
+      end;
     end;
-  end;
-  if not found then
-  begin
-    raise EDJError.Create
-      ('Given object type is missing the JSONSerializable attribute. ' +
-      context.ToString);
+    if not found then
+    begin
+      raise EDJError.Create
+        ('Given object type is missing the JSONSerializable attribute. ' +
+        context.ToString);
+    end;
   end;
 
   // getting fields from the object
@@ -1328,7 +1336,7 @@ end;
 
 constructor TDJSettings.Default;
 begin
-
+  RequireSerializableAttributeForNonRTLClasses := true;
 end;
 
 end.
