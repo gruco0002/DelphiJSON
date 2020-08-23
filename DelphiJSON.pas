@@ -6,13 +6,22 @@ uses
   System.SysUtils, System.JSON, System.RTTI, System.Generics.Collections;
 
 type
+
+  TDJSettings = class
+  public
+
+    constructor Default;
+
+  end;
+
   DelphiJSON<T> = class
 
   public
-    class function Deserialize(data: String): T;
-    class function DeserializeJ(data: TJSONValue): T;
-    class function Serialize(data: T): string;
-    class function SerializeJ(data: T): TJSONValue;
+    class function Deserialize(data: String; settings: TDJSettings = nil): T;
+    class function DeserializeJ(data: TJSONValue;
+      settings: TDJSettings = nil): T;
+    class function Serialize(data: T; settings: TDJSettings = nil): string;
+    class function SerializeJ(data: T; settings: TDJSettings = nil): TJSONValue;
 
   private
     constructor Create;
@@ -37,6 +46,7 @@ type
     path: TStack<string>;
   public
     RTTI: TRttiContext;
+    settings: TDJSettings;
 
     constructor Create;
     destructor Destroy; override;
@@ -1197,46 +1207,69 @@ begin
   raise EDJError.Create('Do not create instances of this object!');
 end;
 
-class function DelphiJSON<T>.Deserialize(data: String): T;
+class function DelphiJSON<T>.Deserialize(data: String;
+  settings: TDJSettings): T;
 var
   val: TJSONValue;
 begin
   val := TJSONObject.ParseJSONValue(data, true, true);
-  Result := DeserializeJ(val);
+  Result := DeserializeJ(val, settings);
   val.Free;
 end;
 
-class function DelphiJSON<T>.DeserializeJ(data: TJSONValue): T;
+class function DelphiJSON<T>.DeserializeJ(data: TJSONValue;
+  settings: TDJSettings): T;
 var
   context: TDerContext;
   rttiType: TRttiType;
   res: TValue;
+  createdSettings: TDJSettings;
 begin
+  createdSettings := nil;
+  if settings = nil then
+  begin
+    createdSettings := TDJSettings.Default;
+    settings := createdSettings;
+  end;
+
   context := TDerContext.Create;
+  context.settings := settings;
   rttiType := context.RTTI.GetType(System.TypeInfo(T));
   res := DeserializeInternal(data, rttiType, context);
   context.Free;
+  createdSettings.Free;
   Result := res.AsType<T>();
 end;
 
-class function DelphiJSON<T>.Serialize(data: T): string;
+class function DelphiJSON<T>.Serialize(data: T; settings: TDJSettings): string;
 var
   JsonValue: TJSONValue;
 begin
-  JsonValue := SerializeJ(data);
+  JsonValue := SerializeJ(data, settings);
   Result := JsonValue.ToJSON;
   JsonValue.Free;
 end;
 
-class function DelphiJSON<T>.SerializeJ(data: T): TJSONValue;
+class function DelphiJSON<T>.SerializeJ(data: T; settings: TDJSettings)
+  : TJSONValue;
 var
   valueObject: TValue;
   context: TSerContext;
+  createdSettings: TDJSettings;
 begin
+  createdSettings := nil;
+  if settings = nil then
+  begin
+    createdSettings := TDJSettings.Default;
+    settings := createdSettings;
+  end;
+
   context := TSerContext.Create;
+  context.settings := settings;
   valueObject := TValue.From<T>(data);
   Result := SerializeInternal(valueObject, context);
   context.Free;
+  createdSettings.Free;
 end;
 
 { DJValueAttribute }
@@ -1289,6 +1322,13 @@ end;
 function TSerContext.ToString: string;
 begin
   Result := 'Context: { ' + FullPath + ' }';
+end;
+
+{ TDJSettings }
+
+constructor TDJSettings.Default;
+begin
+
 end;
 
 end.
