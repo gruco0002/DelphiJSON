@@ -45,6 +45,9 @@ type
   DJNonNilableAttribute = class(TCustomAttribute)
   end;
 
+  DJConstructorAttribute = class(TCustomAttribute)
+  end;
+
   EDJError = class(Exception);
 
   TSerContext = class
@@ -521,6 +524,8 @@ var
   BaseType: TRttiType;
 
   params: TArray<TValue>;
+  attribute: TCustomAttribute;
+  isSelectedConstructor: Boolean;
 begin
   objType := dataType.AsInstance;
 
@@ -537,6 +542,7 @@ begin
 
   for method in objType.GetMethods do
   begin
+    isSelectedConstructor := False;
 
     if not method.IsConstructor then
     begin
@@ -550,12 +556,31 @@ begin
       continue;
     end;
 
-    if not(method.Visibility in [TMemberVisibility.mvPublished,
-      TMemberVisibility.mvPublic]) then
+    for attribute in method.GetAttributes do
     begin
-      continue;
+      if attribute is DJConstructorAttribute then
+      begin
+        isSelectedConstructor := true;
+        break;
+      end;
     end;
 
+    if not isSelectedConstructor then
+    begin
+      // further searching for constructors
+      if not(method.Visibility in [TMemberVisibility.mvPublished,
+        TMemberVisibility.mvPublic]) then
+      begin
+        continue;
+      end;
+
+      if method.Name.ToLower <> 'create' then
+      begin
+        continue;
+      end;
+    end;
+
+    // checking the number of parameters
     counter := 0;
     for tmp in method.GetParameters do
     begin
@@ -567,22 +592,31 @@ begin
       continue;
     end;
 
-    if method.Name.ToLower <> 'create' then
-    begin
-      continue;
-    end;
-
+    // checking if the currently selected method should be replaced
     if selectedMethod <> nil then
     begin
-      BaseType := method.Parent;
-      while BaseType <> nil do
+
+      if selectedMethod.Parent = method.Parent then
       begin
-        if BaseType = selectedMethod.Parent then
+        if isSelectedConstructor then
         begin
-          // the selected constructor is from a base class, hence choose the current "higher" constructor
+          // only replace the constructor of the same class with one from the same class if it is the choosen one
           selectedMethod := method;
         end;
-        BaseType := BaseType.BaseType;
+      end
+      else
+      begin
+        // check if the selected constructor is from a base class of the current one being checked (if so, replace it)
+        BaseType := method.Parent;
+        while BaseType <> nil do
+        begin
+          if BaseType = selectedMethod.Parent then
+          begin
+            // the selected constructor is from a base class, hence choose the current "higher" constructor
+            selectedMethod := method;
+          end;
+          BaseType := BaseType.BaseType;
+        end;
       end;
     end
     else

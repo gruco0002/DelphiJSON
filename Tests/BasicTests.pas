@@ -45,7 +45,12 @@ type
     [DJValue('int')]
     testInt: Integer;
 
+    createdThroughJSON: boolean;
+
     constructor Create;
+
+    [DJConstructor]
+    constructor CreateJSON;
 
   end;
 
@@ -70,6 +75,7 @@ begin
   Assert.AreEqual(true, tmp.testBool);
   Assert.AreEqual(123, tmp.testInt);
   Assert.AreEqual(notSerText, tmp.testTextNotSer);
+  Assert.IsTrue(tmp.createdThroughJSON);
 
   tmp.Free;
 
@@ -90,6 +96,7 @@ begin
   t.testText := 'testText1';
   t.testBool := true;
   t.testInt := 123;
+  Assert.IsFalse(t.createdThroughJSON);
 
   obj1 := DelphiJSON<TTestClass>.SerializeJ(t);
   ser := obj1.ToJSON;
@@ -109,6 +116,13 @@ end;
 
 constructor TTestClass.Create;
 begin
+  createdThroughJSON := false;
+  testTextNotSer := notSerText;
+end;
+
+constructor TTestClass.CreateJSON;
+begin
+  createdThroughJSON := true;
   testTextNotSer := notSerText;
 end;
 
