@@ -21,7 +21,7 @@ By using explicit JSON names this would not happen by accident, allowing for a m
 Since this is a single source file library, it is sufficient if you just download the `DelphiJSON.pas` file from a release or the master branch of the repository.
 
 ### Install
-You can either 'install' the library inside a specific project (1) or for your whole environment (2).
+You can either 'install' the library inside a specific project or for your whole environment.
 
 #### Specific Project
 Copy the file to your project folder and add it as Unit to your project. Then you should be ready to go.
@@ -32,9 +32,94 @@ Copy the file to your project folder and add it as Unit to your project. Then yo
 To install the library for the whole Delphi environment on your pc, save the unit file (`DelphiJSON.pas`) to a fixed location. Then add the directory, in which you placed the unit to the global search path and library path of the compiler. For RadStudio this would be under `Tools` -> `Options` -> `Language` -> `Delphi` (Make sure the correct platform is selected). 
 
 ### Use
+To use the library add `DelphiJSON` to your uses in the respective unit.
 
-TODO
+After that start anotating your classes or records. An example would be:
+```pascal
+type
 
+  [DJSerializable]
+  TTestClass = class(TObject)
+
+    [DJValue('textField')]
+    testText: string;
+
+    testTextNotSer: string;
+
+    [DJValue('boolField')]
+    testBool: boolean;
+
+    [DJValue('int')]
+    testInt: Integer;
+
+  end;
+```
+
+Every field that should be (de)serialized has to be annotated with the `DJValue` attribute that also contains the JSON name of this field. The JSON name (e.g. `boolField` is the JSON name of the Delphi field `testBool`) does not have to be the same as the Delphi name of the field. Fields that do not have the `DJValue` attribute will be ignored by the (de)serializer.
+
+Furthermore add the `DJSerializable` attribute to the record or class if it should be (de)serializable.
+**Note:** All records or classes that should be (de)serializable have to be annotated with the `DJSerializable` attribute, otherwise an error message will be raised upon (de)serialization.
+
+To serialize data call the `DelphiJSON<T>.Serialize` function.
+It is important to use the correct type! The result of the serialization is a string containg the JSON data.
+An example would be (For further examples have a look in the test units):
+```pascal
+procedure SerializeMyData(data: TTestClass);
+var
+    serialized: string;
+begin
+    serialized := DelphiJSON<TTestClass>.Serialize(data);
+    WriteLn(serialized);
+end;
+```
+
+
+To deserialize an object call the `DelphiJSON<T>.Deserialize` function. It returns the respective type and takes the JSON data as a string parameter. Be sure to use the correct type! An example would be:
+```pascal
+function DeserializeMyData(jsonString: string) : TTestClass;
+begin
+    Result := DelphiJSON<TTestClass>.Deserialize(jsonString);
+end;
+```
+
+Also other data (not only your own objects) can be (de)serialized. The following shows a few examples for the serialization (deserialization works vice versa):
+```pascal
+procedure SerializeExample;
+var
+    list: TList<string>;
+    serializedList: string;
+
+    dt: TDateTime;
+    serializedDateTime: string;
+
+    dict: TDictionary<TDateTime, string>;
+    serializedDict: string;
+begin
+    // list example
+    list := TList.Create;
+    list.Add('Hello');
+    list.Add('World');
+    list.Add('!');
+    
+    serializedList := DelphiJSON<TList<string>>.Serialize(list);
+    WriteLn(serializedList);
+
+    // date time example
+    dt := EncodeDateTime(2020, 4, 23, 10, 12, 11, 154);
+    
+    serializedDateTime := DelphiJSON<TDateTime>.Serialize(dt);
+    WriteLn(serializedDateTime);
+
+    // dictionary example
+    dict := TDictionary<TDateTime, string>.Create;
+    dict.Add(EncodeDateTime(2020, 4, 23, 10, 12, 11, 154), 'April was nice!');
+    dict.Add(EncodeDateTime(2020, 8, 23, 10, 12, 11, 154), 'August was hot!');
+    dict.Add(Now, 'The current time.');
+
+    serializedDict := DelphiJSON<TDictionary<TDateTime, string>>.Serialize(dict);
+    WriteLn(serializedDict);
+end;
+```
 
 ## Further Information
 
