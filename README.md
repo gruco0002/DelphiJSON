@@ -31,11 +31,13 @@ Copy the file to your project folder and add it as Unit to your project. Then yo
 #### Environment
 To install the library for the whole Delphi environment on your pc, save the unit file (`DelphiJSON.pas`) to a fixed location. Then add the directory, in which you placed the unit to the global search path and library path of the compiler. For RadStudio this would be under `Tools` -> `Options` -> `Language` -> `Delphi` (Make sure the correct platform is selected). 
 
-### Use
+### How to use
 To use the library add `DelphiJSON` to your uses in the respective unit.
 
 After that start anotating your classes or records. An example would be:
 ```pascal
+uses DelphiJSON;
+
 type
 
   [DJSerializable]
@@ -84,6 +86,8 @@ end;
 
 Also other data (not only your own objects) can be (de)serialized. The following shows a few examples for the serialization (deserialization works vice versa):
 ```pascal
+uses DelphiJSON, System.Generics.Collections, System.SysUtils, System.DateUtils;
+
 procedure SerializeExample;
 var
     list: TList<string>;
