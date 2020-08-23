@@ -126,5 +126,9 @@ end;
 ```
 
 ## Further Information
+This project/library is licensed under the MIT License (see `LICENSE` file).
+If you find bugs, memory leaks or other errors feel free to open an issue.
+New ideas, improvements and suggestions can also be added as an issue. In general feedback is welcome!
 
-TODO
+If you use the library or like it, it would be nice if you leave a star :star: for this repository.
+Although you do not have to inform me if you use the library, feel free to do so (publicly or private) :smile:
