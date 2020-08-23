@@ -11,6 +11,7 @@ type
   public
 
     RequireSerializableAttributeForNonRTLClasses: Boolean;
+    DateTimeReturnUTC: Boolean;
 
     constructor Default;
 
@@ -255,8 +256,7 @@ var
   str: string;
 begin
   dt := data.AsType<TDateTime>();
-  // TODO: add sth to handle timezones (and perhaps a setting in the context?)
-  str := DateToISO8601(dt);
+  str := DateToISO8601(dt, context.settings.DateTimeReturnUTC);
   Result := TJSONString.Create(str);
 end;
 
@@ -906,9 +906,7 @@ begin
   end;
   jStr := value as TJSONString;
   str := value.value;
-
-  // TODO: add sth to handle timezones (and perhaps a setting in the context?)
-  dt := ISO8601ToDate(str);
+  dt := ISO8601ToDate(str, context.settings.DateTimeReturnUTC);
   objOut := TValue.From(dt);
 end;
 
@@ -1337,6 +1335,7 @@ end;
 constructor TDJSettings.Default;
 begin
   RequireSerializableAttributeForNonRTLClasses := true;
+  DateTimeReturnUTC := true;
 end;
 
 end.
