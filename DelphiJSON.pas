@@ -53,6 +53,11 @@ type
   TSerContext = class
   private
     path: TStack<string>;
+
+    // keeps track of heap allocated objects in order to free them, if an error happens and no value can be returned
+    // this is implemented to avoid memory leaks through invalid json or parameters / other issues
+    heapAllocatedObjects: TDictionary<TObject, Boolean>;
+
   public
     RTTI: TRttiContext;
     settings: TDJSettings;
@@ -64,6 +69,10 @@ type
     procedure PushPath(val: string); overload;
     procedure PushPath(index: Integer); overload;
     procedure PopPath;
+
+    procedure AddHeapObject(obj: TObject);
+    procedure RemoveHeapObject(obj: TObject);
+    procedure FreeAllHeapObjects;
 
     function ToString: string;
 
@@ -84,13 +93,17 @@ function SerArray(value: TValue; context: TSerContext): TJSONArray;
 var
   size: Integer;
   i: Integer;
+  tmp: TJSONValue;
 begin
   Result := TJSONArray.Create;
+  context.AddHeapObject(Result);
   size := value.GetArrayLength;
   for i := 0 to size - 1 do
   begin
     context.PushPath(i.ToString);
-    Result.AddElement(SerializeInternal(value.GetArrayElement(i), context));
+    tmp := SerializeInternal(value.GetArrayElement(i), context);
+    context.RemoveHeapObject(tmp);
+    Result.AddElement(tmp);
     context.PopPath;
   end;
 end;
@@ -98,21 +111,25 @@ end;
 function SerFloat(value: TValue; context: TSerContext): TJSONNumber;
 begin
   Result := TJSONNumber.Create(value.AsType<Single>());
+  context.AddHeapObject(Result);
 end;
 
 function SerInt64(value: TValue; context: TSerContext): TJSONNumber;
 begin
   Result := TJSONNumber.Create(value.AsInt64);
+  context.AddHeapObject(Result);
 end;
 
 function SerInt(value: TValue; context: TSerContext): TJSONNumber;
 begin
   Result := TJSONNumber.Create(value.AsInteger);
+  context.AddHeapObject(Result);
 end;
 
 function SerString(value: TValue; context: TSerContext): TJSONString;
 begin
   Result := TJSONString.Create(value.AsString);
+  context.AddHeapObject(result);
 end;
 
 function SerTEnumerable(data: TObject; dataType: TRttiType;
@@ -138,6 +155,7 @@ begin
   currentProperty := getEnumerator.ReturnType.GetProperty('Current');
 
   Result := TJSONArray.Create;
+  context.AddHeapObject(Result);
 
   // inital move
   moveNextValue := moveNext.Invoke(enumerator.AsObject, []);
@@ -153,6 +171,7 @@ begin
     context.PushPath(i.ToString);
     currentSerialized := SerializeInternal(currentValue, context);
     context.PopPath;
+    context.RemoveHeapObject(currentSerialized);
     Result.AddElement(currentSerialized);
 
     // move to the next object
@@ -197,6 +216,7 @@ begin
   valueField := currentProperty.PropertyType.GetField('Value');
 
   Result := TJSONObject.Create;
+  context.AddHeapObject(Result);
 
   // inital move
   moveNextValue := moveNext.Invoke(enumerator.AsObject, []);
@@ -215,6 +235,7 @@ begin
     context.PushPath(keyString);
     serializedValue := SerializeInternal(valueValue, context);
     context.PopPath;
+    context.RemoveHeapObject(serializedValue);
     Result.AddPair(keyString, serializedValue);
 
     // move to the next object
@@ -250,7 +271,10 @@ begin
   context.PopPath;
 
   Result := TJSONObject.Create;
+  context.AddHeapObject(Result);
+  context.RemoveHeapObject(serializedKey);
   Result.AddPair('key', serializedKey);
+  context.RemoveHeapObject(serializedValue);
   Result.AddPair('value', serializedValue);
 
 end;
@@ -264,6 +288,7 @@ begin
   dt := data.AsType<TDateTime>();
   str := DateToISO8601(dt, context.settings.DateTimeReturnUTC);
   Result := TJSONString.Create(str);
+  context.AddHeapObject(Result);
 end;
 
 function SerHandledSpecialCase(data: TValue; dataType: TRttiType;
@@ -356,6 +381,7 @@ begin
 
   // Init the result object
   resultObject := TJSONObject.Create;
+  context.AddHeapObject(resultObject);
   Result := resultObject;
 
   // adding fields to the object
@@ -427,6 +453,7 @@ begin
     context.PopPath;
 
     // add the variable to the resulting object
+    context.RemoveHeapObject(serializedField);
     resultObject.AddPair(jsonFieldName, serializedField);
 
   end;
@@ -471,10 +498,12 @@ begin
   else if value.IsEmpty then
   begin
     Result := TJSONNull.Create;
+    context.AddHeapObject(Result);
   end
   else if value.IsType<Boolean> then
   begin
     Result := TJSONBool.Create(value.AsBoolean);
+    context.AddHeapObject(Result);
   end
   else if value.IsObject then
   begin
@@ -633,7 +662,7 @@ begin
   end;
 
   Result := selectedMethod.Invoke(objType.MetaclassType, params);
-
+  context.AddHeapObject(Result.AsObject);
 end;
 
 function DerArray(value: TJSONArray; dataType: TRttiType;
@@ -1371,16 +1400,41 @@ end;
 
 { TSerContext }
 
+procedure TSerContext.AddHeapObject(obj: TObject);
+begin
+  heapAllocatedObjects.AddOrSetValue(obj, False);
+end;
+
 constructor TSerContext.Create;
 begin
   self.path := TStack<string>.Create;
   self.RTTI := TRttiContext.Create;
+  self.heapAllocatedObjects := TDictionary<TObject, Boolean>.Create;
 end;
 
 destructor TSerContext.Destroy;
 begin
   self.path.Free;
+  self.path := nil;
   self.RTTI.Free;
+  self.heapAllocatedObjects.Free;
+  self.heapAllocatedObjects := nil;
+end;
+
+procedure TSerContext.FreeAllHeapObjects;
+var
+  obj: TObject;
+  freed: Boolean;
+begin
+  for obj in heapAllocatedObjects.Keys do
+  begin
+    freed := heapAllocatedObjects[obj];
+    if not freed then
+    begin
+      obj.Free;
+      heapAllocatedObjects[obj] := true;
+    end;
+  end;
 end;
 
 function TSerContext.FullPath: string;
@@ -1402,6 +1456,11 @@ end;
 procedure TSerContext.PushPath(index: Integer);
 begin
   path.Push(index.ToString);
+end;
+
+procedure TSerContext.RemoveHeapObject(obj: TObject);
+begin
+  heapAllocatedObjects.Remove(obj);
 end;
 
 procedure TSerContext.PushPath(val: string);
