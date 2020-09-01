@@ -1,3 +1,10 @@
+///
+/// DelphiJSON Library - Copyright (c) 2020 Corbinian Gruber
+///
+/// This library is licensed under the MIT License.
+/// https://github.com/gruco0002/DelphiJSON
+///
+
 unit DelphiJSON;
 
 interface
@@ -7,24 +14,115 @@ uses
 
 type
 
+  /// <summary>
+  /// Defines settings for the (de)serialization.
+  /// </summary>
   TDJSettings = class
   public
 
+    /// <summary>
+    /// Determines if the [DJSerializableAttribute] is needed as annotation for classes / records.
+    /// The default is true.
+    /// It is not recommended to set the value to false.
+    /// Most serializable RTL classes / records are not affected by this.
+    /// </summary>
     RequireSerializableAttributeForNonRTLClasses: Boolean;
+
+    /// <summary>
+    /// Determines if the date time (de)serialization assumes that the Delphi
+    /// value stored in a TDateTime object is considered to be UTC time.
+    /// The default is true.
+    /// More information can be found in the RTL documentation for [System.DateUtils.DateToISO8601]
+    /// </summary>
     DateTimeReturnUTC: Boolean;
+
+    /// <summary>
+    /// Makes the (de)serializer ignore all [DJNonNilableAttribute] annotations.
+    /// This can be used if values are allowed to be nil during serialization,
+    /// but not during deserialization.
+    /// It only affects fields annotated with [DJNonNilableAttribute].
+    /// The default is false.
+    /// </summary>
     IgnoreNonNillable: Boolean;
 
+    /// <summary>
+    /// If set to true, makes all fields required. If set to false all fields are optional.
+    /// This has only an effect during deserialization.
+    /// The default value if true.
+    /// This value is ignored if a field is annotated with the [DJRequiredAttribute].
+    /// A required field that is not present in a JSON object causes an
+    /// [EDJRequiredError] exception during deserialization.
+    /// If a field is not required, it has not to be present in the JSON object.
+    /// In this case the delphi field is not set to anything or a default value
+    /// if either the [DJDefaultValueAttribute] or the [DJDefaultValueCreatorAttribute] is present.
+    /// </summary>
+    RequiredByDefault: Boolean;
+
+    /// <summary>
+    /// Creates the default settings for (de)serialization.
+    /// </summary>
     constructor Default;
 
   end;
 
+  /// <summary>
+  /// Static class that has functions for (de)serializing.
+  /// Note: always specify the correct type for [T]. Wrong types could lead to
+  /// undefined behaviour.
+  /// An instance of this class must not be created.
+  /// </summary>
   DelphiJSON<T> = class
 
   public
+
+    /// <summary>
+    /// Deserializes the JSON string [data] into the specified object type.
+    /// Optional settings can be given with the [settings] argument.
+    /// If [settings] are given they are not freed by the function.
+    /// If the deserialization causes an error this function will throw this
+    /// error after an internal cleanup to avoid memory leaks.
+    /// Note: always specify the correct type for [T]. Wrong types could lead to
+    /// undefined behaviour.
+    /// </summary>
     class function Deserialize(data: String; settings: TDJSettings = nil): T;
+
+    /// <summary>
+    /// Deserializes the JSON value [data] into the specified object type.
+    /// The given value [data] is not freed by the function.
+    /// Optional settings can be given with the [settings] argument.
+    /// If [settings] are given they are not freed by the function.
+    /// If the deserialization causes an error this function will throw this
+    /// error after an internal cleanup to avoid memory leaks.
+    /// Note: always specify the correct type for [T]. Wrong types could lead to
+    /// undefined behaviour.
+    /// </summary>
     class function DeserializeJ(data: TJSONValue;
       settings: TDJSettings = nil): T;
+
+    /// <summary>
+    /// Serializes the given [data] into a JSON string.
+    /// The [data] is not freed by the function.
+    /// Optional settings can be given with the [settings] argument.
+    /// If [settings] are given they are not freed by the function.
+    /// If the serialization causes an error this function will throw this
+    /// error after an internal cleanup to avoid memory leaks.
+    /// Note: always specify the correct type for [T]. Wrong types could lead to
+    /// undefined behaviour.
+    /// </summary>
     class function Serialize(data: T; settings: TDJSettings = nil): string;
+
+    /// <summary>
+    /// Serializes the given [data] into a JSON value.
+    /// The [data] is not freed by the function.
+    /// Optional settings can be given with the [settings] argument.
+    /// If [settings] are given they are not freed by the function.
+    /// If the serialization causes an error this function will throw this
+    /// error after an internal cleanup to avoid memory leaks.
+    /// The resources (JSON Values) are not managed by the serializer and belong
+    /// to the caller of the function after it returns!
+    /// Note: always specify the correct type for [T]. Wrong types could lead to
+    /// undefined behaviour.
+    /// </summary>
     class function SerializeJ(data: T; settings: TDJSettings = nil): TJSONValue;
 
   private
@@ -32,23 +130,118 @@ type
 
   end;
 
-  /// This attribute allows a field or property to be serialized / deserialized.
+  /// <summary>
+  /// Makes a field (de)serializable and specifies its JSON name.
+  /// All fields that are not annotated with this attribute are ignored during
+  /// the (de)serialization.
+  /// The name has to be unique for an object.
+  /// </summary>
   DJValueAttribute = class(TCustomAttribute)
   public
     Name: string;
     constructor Create(const Name: string);
   end;
 
+  /// <summary>
+  /// Makes a class or record (de)serializable.
+  /// This attribute is needed to explicitly state that a class / record is serializable.
+  /// </summary>
   DJSerializableAttribute = class(TCustomAttribute)
   end;
 
+  /// <summary>
+  /// Makes the annotated field non nillable.
+  /// During (de)serialization a nil/null value for this field would cause an [EDJNilError].
+  /// This behaviour can be overwritten by the [IgnoreNonNillable] property of the [TDJSettings].
+  /// </summary>
   DJNonNilableAttribute = class(TCustomAttribute)
   end;
 
+  /// <summary>
+  /// Makes the annotated constructor the default constructor that is used for deserialization.
+  /// The constructor must not have any arguments.
+  /// If no constructor is annotated the Create constructor will be used (if it does not require any arguments)
+  /// </summary>
   DJConstructorAttribute = class(TCustomAttribute)
   end;
 
+  IDJDefaultValue = class(TCustomAttribute)
+  protected
+    function GetValue: TValue; virtual; abstract;
+  end;
+
+  /// <summary>
+  /// Defines a default value for a field that is used during deserialization.
+  /// The default value is used if the field is not defined in the given JSON object.
+  /// This attribute only supports primitive values.
+  /// This attribute has no effect if not used together with either the [DJDefaultOnNilAttribute] or the [DJRequiredAttribute].
+  /// </summary>
+  DJDefaultValueAttribute = class(IDJDefaultValue)
+  private
+    value: TValue;
+  protected
+    function GetValue: TValue; override;
+  public
+    constructor Create(const value: string); overload;
+    constructor Create(const value: integer); overload;
+    constructor Create(const value: single); overload;
+    constructor Create(const value: double); overload;
+    constructor Create(const value: Boolean); overload;
+    constructor Create(const value: TValue); overload;
+  end;
+
+  /// <summary>
+  /// Defines a generator for a default value for a field that is used during deserialization.
+  /// The default value is used if the field is not defined in the given JSON object.
+  /// The generator is called during the deserialization.
+  /// This attribute has no effect if not used together with either the [DJDefaultOnNilAttribute] or the [DJRequiredAttribute].
+  /// </summary>
+  DJDefaultValueCreatorAttribute<T> = class(IDJDefaultValue)
+  private
+    generator: TFunc<T>;
+  protected
+    function GetValue: TValue; override;
+  public
+    constructor Create(const generator: TFunc<T>);
+  end;
+
+  /// <summary>
+  /// Makes the field use the default value if it has the value nil / null during deserialization.
+  /// This attribute has only an effect if used together with one of the default
+  /// value attributes [DJDefaultValueCreatorAttribute] or [DJDefaultValueAttribute]
+  /// </summary>
+  DJDefaultOnNilAttribute = class(TCustomAttribute)
+  end;
+
+  /// <summary>
+  /// Makes a field required if [required] is true and optional if [required] is false.
+  /// The default value is true. This attribute only affects the deserialization.
+  /// This overrides the settings given by the [DJSettings] object for the annotated field.
+  /// If a required field is not specified in the JSON object an [EDJRequiredError] is thrown.
+  /// Note that nil/null values for a field do not raise an exception, since the field is
+  /// existing in the JSON object (See [DJNonNilableAttribute] for that case)
+  /// </summary>
+  DJRequiredAttribute = class(TCustomAttribute)
+  public
+    required: Boolean;
+    constructor Create(const required: Boolean = true);
+  end;
+
+  /// <summary>
+  /// Describes an error that happened during deserialization.
+  /// </summary>
   EDJError = class(Exception);
+
+  /// <summary>
+  /// This error is raised if an required field is not found in the JSON object.
+  /// </summary>
+  EDJRequiredError = class(EDJError);
+
+  /// <summary>
+  /// This error is raised if a field is nil/null although it is annotated with
+  /// the [DJNonNilableAttribute].
+  /// </summary>
+  EDJNilError = class(EDJError);
 
   TSerContext = class
   private
@@ -67,14 +260,14 @@ type
 
     function FullPath: string;
     procedure PushPath(val: string); overload;
-    procedure PushPath(index: Integer); overload;
+    procedure PushPath(index: integer); overload;
     procedure PopPath;
 
     procedure AddHeapObject(obj: TObject);
     procedure RemoveHeapObject(obj: TObject);
     procedure FreeAllHeapObjects;
 
-    function ToString: string;
+    function ToString: string; override;
 
   end;
 
@@ -91,8 +284,8 @@ uses
 
 function SerArray(value: TValue; context: TSerContext): TJSONArray;
 var
-  size: Integer;
-  i: Integer;
+  size: integer;
+  i: integer;
   tmp: TJSONValue;
 begin
   Result := TJSONArray.Create;
@@ -110,7 +303,7 @@ end;
 
 function SerFloat(value: TValue; context: TSerContext): TJSONNumber;
 begin
-  Result := TJSONNumber.Create(value.AsType<Single>());
+  Result := TJSONNumber.Create(value.AsType<single>());
   context.AddHeapObject(Result);
 end;
 
@@ -143,7 +336,7 @@ var
   currentSerialized: TJSONValue;
   moveNextValue: TValue;
   moveNextResult: Boolean;
-  i: Integer;
+  i: integer;
 begin
   // idea: fetch enumerator with rtti, enumerate using movenext, adding objects
   // to the array
@@ -348,7 +541,6 @@ var
   jsonFieldName: string;
   fieldValue: TValue;
   serializedField: TJSONValue;
-  tmp: TJSONValue;
 
   nillable: Boolean;
 begin
@@ -548,7 +740,7 @@ var
   selectedMethod: TRttiMethod;
 
   tmp: TRttiParameter;
-  counter: Integer;
+  counter: integer;
 
   BaseType: TRttiType;
 
@@ -670,7 +862,7 @@ function DerArray(value: TJSONArray; dataType: TRttiType;
 var
   res: array of TValue;
   valueType: TRttiType;
-  i: Integer;
+  i: integer;
   staticType: TRttiArrayType;
 begin
   if dataType.Handle^.Kind = TTypeKind.tkDynArray then
@@ -712,9 +904,9 @@ end;
 function DerNumber(value: TJSONNumber; dataType: TRttiType;
   context: TDerContext): TValue;
 var
-  valFloat: Double;
+  valFloat: double;
   valInt64: Int64;
-  valInt: Integer;
+  valInt: integer;
 begin
   if dataType.Handle^.Kind = TTypeKind.tkFloat then
   begin
@@ -761,11 +953,11 @@ var
   jPair: TJSONPair;
 
   valueKey: TValue;
-  typeKey: TRttiType;
+  // typeKey: TRttiType;
   valueValue: TValue;
   typeValue: TRttiType;
 
-  i: Integer;
+  i: integer;
 
 begin
   if not(value is TJSONObject) then
@@ -781,7 +973,7 @@ begin
   addMethod := dataType.GetMethod('AddOrSetValue');
 
   // get the types of the key and value
-  typeKey := addMethod.GetParameters[0].ParamType; // this should be a string
+  // typeKey := addMethod.GetParameters[0].ParamType; // this should be a string
   typeValue := addMethod.GetParameters[1].ParamType;
 
   for i := 0 to jsonObject.Count - 1 do
@@ -817,7 +1009,7 @@ var
   valueValue: TValue;
   typeValue: TRttiType;
 
-  i: Integer;
+  i: integer;
 begin
   if not(value is TJSONArray) then
   begin
@@ -940,7 +1132,7 @@ var
   ElementType: TRttiType;
 
   JsonValue: TJSONValue;
-  i: Integer;
+  i: integer;
   elementValue: TValue;
 
 begin
@@ -997,7 +1189,7 @@ begin
       context.ToString);
   end;
   jStr := value as TJSONString;
-  str := value.value;
+  str := jStr.Value;
   dt := ISO8601ToDate(str, context.settings.DateTimeReturnUTC);
   objOut := TValue.From(dt);
 end;
@@ -1495,7 +1687,7 @@ begin
   path.Pop;
 end;
 
-procedure TSerContext.PushPath(index: Integer);
+procedure TSerContext.PushPath(index: integer);
 begin
   path.Push(index.ToString);
 end;
@@ -1522,6 +1714,63 @@ begin
   RequireSerializableAttributeForNonRTLClasses := true;
   DateTimeReturnUTC := true;
   IgnoreNonNillable := False;
+  RequiredByDefault := true;
+end;
+
+{ DJDefaultValueAttribute }
+
+constructor DJDefaultValueAttribute.Create(const value: single);
+begin
+  self.value := TValue.From(value);
+end;
+
+constructor DJDefaultValueAttribute.Create(const value: integer);
+begin
+  self.value := TValue.From(value);
+end;
+
+constructor DJDefaultValueAttribute.Create(const value: string);
+begin
+  self.value := TValue.From(value);
+end;
+
+constructor DJDefaultValueAttribute.Create(const value: TValue);
+begin
+  self.value := value;
+end;
+
+function DJDefaultValueAttribute.GetValue: TValue;
+begin
+  Result := self.value;
+end;
+
+constructor DJDefaultValueAttribute.Create(const value: Boolean);
+begin
+  self.value := TValue.From(value);
+end;
+
+constructor DJDefaultValueAttribute.Create(const value: double);
+begin
+  self.value := TValue.From(value);
+end;
+
+{ DJDefaultValueCreatorAttribute<T> }
+
+constructor DJDefaultValueCreatorAttribute<T>.Create(const generator: TFunc<T>);
+begin
+  self.generator := generator;
+end;
+
+function DJDefaultValueCreatorAttribute<T>.GetValue: TValue;
+begin
+  Result := TValue.From<T>(generator());
+end;
+
+{ DJRequiredAttribute }
+
+constructor DJRequiredAttribute.Create(const required: Boolean);
+begin
+  self.required := required;
 end;
 
 end.
