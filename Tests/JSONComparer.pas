@@ -30,7 +30,6 @@ begin
   begin
     p := value1.Pairs[i];
 
-    val := nil;
     val := value2.GetValue(p.JsonString.Value);
     if val = nil then
     begin
@@ -111,14 +110,14 @@ begin
     begin
       Result := false;
       used.Free;
-      used := nil;
+
       exit;
     end;
 
   end;
 
   used.Free;
-  used := nil;
+
   Result := true;
 end;
 

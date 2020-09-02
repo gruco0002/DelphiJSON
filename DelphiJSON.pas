@@ -755,12 +755,12 @@ var
 begin
   objType := dataType.AsInstance;
 
-  // TODO: find correct constructor (since create is not always supported with no arguments)
+  // find correct constructor (since create is not always supported with no arguments)
   // idea: Iterate over all constructors of the instance and choose a fitting one by the following priority:
-  // 1. one tagged with an (yet to introduce) attribute
-  // 2. Create (if it does not need any arguments)
-  // 3. Error Message
-  // an alternative to that would be a way to create the object without the use of a constructor (if this is possible)
+  // 1. Check if there are special cases (E.g. TDictionary, ...) and use the hardcoded constructors
+  // 2. use one tagged with the [DJConstructorAttribute]
+  // 3. use the [Create] constructor (if it does not need any arguments)
+  // otherwise an error is thrown, since no valid constructor was found
 
   selectedMethod := nil;
 
@@ -810,7 +810,7 @@ begin
     counter := 0;
     for tmp in method.GetParameters do
     begin
-      // TODO: check if a default value is set
+      // Ideal case: check if a default value is set and use it (This is sadly (currently) not possible with RTTI)
       Inc(counter);
     end;
     if counter <> 0 then
@@ -1392,9 +1392,12 @@ begin
         if defaultValue <> nil then
         begin
           // a default value is defined, use it
-          // TODO: check for memory leak / object registration if value is a heap object
           context.PushPath(jsonFieldName);
           fieldValue := defaultValue.GetValue;
+          if fieldValue.IsObject then
+          begin
+            context.AddHeapObject(fieldValue.AsObject);
+          end;
           context.PopPath;
         end;
 
@@ -1417,9 +1420,12 @@ begin
         if defaultValue <> nil then
         begin
           // a default value is defined, use it
-          // TODO: check for memory leak / object registration if value is a heap object
           context.PushPath(jsonFieldName);
           fieldValue := defaultValue.GetValue;
+          if fieldValue.IsObject then
+          begin
+            context.AddHeapObject(fieldValue.AsObject);
+          end;
           context.PopPath;
         end
         else
