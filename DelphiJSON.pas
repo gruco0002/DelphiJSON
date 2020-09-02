@@ -1267,6 +1267,9 @@ var
   fieldValue: TValue;
 
   nillable: Boolean;
+  required: Boolean;
+  defaultValue: IDJDefaultValue;
+  nilIsDefault: Boolean;
 begin
 
   if isRecord then
@@ -1313,9 +1316,14 @@ begin
   objectFields := dataType.GetFields;
   for field in objectFields do
   begin
-    // check for the attributes
+    // define the standard properties for a field
     found := False;
     nillable := true;
+    required := context.settings.RequiredByDefault;
+    defaultValue := nil;
+    nilIsDefault := False;
+
+    // check for the attributes and update the properties
     for attribute in field.GetAttributes() do
     begin
       if attribute is DJValueAttribute then
@@ -1328,6 +1336,18 @@ begin
       begin
         // nil is not allowed
         nillable := False;
+      end
+      else if attribute is DJRequiredAttribute then
+      begin
+        required := (attribute as DJRequiredAttribute).required;
+      end
+      else if attribute is IDJDefaultValue then
+      begin
+        defaultValue := attribute as IDJDefaultValue;
+      end
+      else if attribute is DJDefaultOnNilAttribute then
+      begin
+        nilIsDefault := true;
       end;
     end;
 
@@ -1353,22 +1373,65 @@ begin
     // check if the field name exists in the json structure
 
     JsonValue := jsonObject.GetValue(jsonFieldName);
-    if JsonValue = nil then
+    if required then
     begin
-      raise EDJError.Create('Value with name "' + jsonFieldName +
-        '" missing in JSON data. ', context.FullPath);
+      // the field is required but was not found
+      if JsonValue = nil then
+      begin
+        raise EDJRequiredError.Create('Value with name "' + jsonFieldName +
+          '" missing in JSON data. ', context.FullPath);
+      end;
+    end
+    else
+    begin
+      // the field is not required, check if it was found
+      if JsonValue = nil then
+      begin
+        // the field was not found, use the default value (if existing) and continue with the next field
+
+        if defaultValue <> nil then
+        begin
+          // a default value is defined, use it
+          // TODO: check for memory leak / object registration if value is a heap object
+          context.PushPath(jsonFieldName);
+          fieldValue := defaultValue.GetValue;
+          context.PopPath;
+        end;
+
+        continue;
+      end;
     end;
 
     // TODO: Add possibilities for converters here
 
-    context.PushPath(jsonFieldName);
-
-    if (not nillable) and (JsonValue is TJSONNull) then
+    if JsonValue is TJSONNull then
     begin
-      raise EDJError.Create('Field value must not be nil, but JSON was null. ',
-        context.FullPath);
+      if not nillable then
+      begin
+        raise EDJNilError.Create
+          ('Field value must not be nil, but JSON was null for field with name "'
+          + jsonFieldName + '". ', context.FullPath);
+      end
+      else if nilIsDefault then
+      begin
+        if defaultValue <> nil then
+        begin
+          // a default value is defined, use it
+          // TODO: check for memory leak / object registration if value is a heap object
+          context.PushPath(jsonFieldName);
+          fieldValue := defaultValue.GetValue;
+          context.PopPath;
+        end
+        else
+        begin
+          raise EDJError.Create
+            ('Field should use a default value if JSON was null, but no default value attribute was defined for field with name "'
+            + jsonFieldName + '". ', context.FullPath);
+        end;
+      end;
     end;
 
+    context.PushPath(jsonFieldName);
     fieldValue := DeserializeInternal(JsonValue, field.FieldType, context);
     context.PopPath;
 
