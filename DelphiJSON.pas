@@ -640,7 +640,7 @@ begin
     begin
       if (not nillable) and (fieldValue.AsObject = nil) then
       begin
-        raise EDJError.Create('Field value must not be nil, but was nil. ',
+        raise EDJNilError.Create('Field value must not be nil, but was nil. ',
           context.FullPath);
       end;
     end;
