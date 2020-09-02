@@ -165,6 +165,9 @@ type
   DJConstructorAttribute = class(TCustomAttribute)
   end;
 
+  /// <summary>
+  /// Internal interface used for default values.
+  /// </summary>
   IDJDefaultValue = class(TCustomAttribute)
   protected
     function GetValue: TValue; virtual; abstract;
@@ -225,6 +228,38 @@ type
   public
     required: Boolean;
     constructor Create(const required: Boolean = true);
+  end;
+
+  /// <summary>
+  /// Internal interface used for converters.
+  /// </summary>
+  IDJConverterInterface = class(TCustomAttribute)
+  protected
+    function ToJSONinternal(value: TValue): TJSONValue; virtual; abstract;
+    function FromJSONinternal(value: TJSONValue): TValue; virtual; abstract;
+  end;
+
+  /// <summary>
+  /// Abstract converter attribute used to implement custom converters.
+  /// Custom converters are implemented by the user by overriding the [ToJSON]
+  /// and [FromJSON] functions.
+  /// The custom converter is then used as an attribute to annotate the fields
+  /// that should be (de)serialized using the converter.
+  /// It is not required to implement both functions as the [ToJSON] function
+  /// is only called during serialization and the [FromJSON] function is only
+  /// called during deserialization.
+  /// Converters are called instead of the normal (de)serialization for the
+  /// given value.
+  /// All other attributes of the annotated field are evaluated before the
+  /// converter is called.
+  /// </summary>
+  DJConverterAttribute<T> = class(IDJConverterInterface)
+  protected
+    function ToJSONinternal(value: TValue): TJSONValue; override;
+    function FromJSONinternal(value: TJSONValue): TValue; override;
+  public
+    function ToJSON(value: T): TJSONValue; virtual; abstract;
+    function FromJSON(value: TJSONValue): T; virtual; abstract;
   end;
 
   /// <summary>
@@ -548,6 +583,7 @@ var
   serializedField: TJSONValue;
 
   nillable: Boolean;
+  converter: IDJConverterInterface;
 begin
 
   dataType := context.RTTI.GetType(value.TypeInfo);
@@ -585,9 +621,12 @@ begin
   objectFields := dataType.GetFields;
   for field in objectFields do
   begin
-    // check for the attributes
+    // default values for properties
     found := False;
     nillable := true;
+    converter := nil;
+
+    // check for the attributes
     for attribute in field.GetAttributes() do
     begin
       if attribute is DJValueAttribute then
@@ -600,6 +639,10 @@ begin
       begin
         // nil is not allowed
         nillable := False;
+      end
+      else if attribute is IDJConverterInterface then
+      begin
+        converter := attribute as IDJConverterInterface;
       end;
     end;
 
@@ -621,8 +664,6 @@ begin
       raise EDJError.Create('Invalid JSON field name: is null or whitespace. ',
         context.FullPath);
     end;
-
-    // TODO: Add possibilities for converters here
 
     if isRecord then
     begin
@@ -646,7 +687,16 @@ begin
     end;
 
     // serialize
-    serializedField := SerializeInternal(fieldValue, context);
+    if converter <> nil then
+    begin
+      // use the converter
+      serializedField := converter.ToJSONinternal(fieldValue);
+    end
+    else
+    begin
+      // use the default serialization
+      serializedField := SerializeInternal(fieldValue, context);
+    end;
     context.PopPath;
 
     // add the variable to the resulting object
@@ -1270,6 +1320,7 @@ var
   required: Boolean;
   defaultValue: IDJDefaultValue;
   nilIsDefault: Boolean;
+  converter: IDJConverterInterface;
 begin
 
   if isRecord then
@@ -1322,6 +1373,7 @@ begin
     required := context.settings.RequiredByDefault;
     defaultValue := nil;
     nilIsDefault := False;
+    converter := nil;
 
     // check for the attributes and update the properties
     for attribute in field.GetAttributes() do
@@ -1348,6 +1400,10 @@ begin
       else if attribute is DJDefaultOnNilAttribute then
       begin
         nilIsDefault := true;
+      end
+      else if attribute is IDJConverterInterface then
+      begin
+        converter := attribute as IDJConverterInterface;
       end;
     end;
 
@@ -1405,8 +1461,6 @@ begin
       end;
     end;
 
-    // TODO: Add possibilities for converters here
-
     if JsonValue is TJSONNull then
     begin
       if not nillable then
@@ -1438,7 +1492,16 @@ begin
     end;
 
     context.PushPath(jsonFieldName);
-    fieldValue := DeserializeInternal(JsonValue, field.FieldType, context);
+    if converter <> nil then
+    begin
+      // converter deserialization
+      fieldValue := converter.FromJSONinternal(JsonValue);
+    end
+    else
+    begin
+      // default deserialization
+      fieldValue := DeserializeInternal(JsonValue, field.FieldType, context);
+    end;
     context.PopPath;
 
     // set the value in the resulting object
@@ -1856,6 +1919,18 @@ begin
   inherited Create(errorMessage + ' - ' + path);
   self.errorMessage := errorMessage;
   self.path := path;
+end;
+
+{ DJConverterAttribute<T> }
+
+function DJConverterAttribute<T>.FromJSONinternal(value: TJSONValue): TValue;
+begin
+  Result := TValue.From<T>(self.FromJSON(value));
+end;
+
+function DJConverterAttribute<T>.ToJSONinternal(value: TValue): TJSONValue;
+begin
+  Result := ToJSON(value.AsType<T>());
 end;
 
 end.
