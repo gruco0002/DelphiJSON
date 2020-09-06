@@ -1457,6 +1457,16 @@ begin
           context.PopPath;
         end;
 
+        // set the value in the resulting object
+        if isRecord then
+        begin
+          field.SetValue(objValue.GetReferenceToRawData, fieldValue);
+        end
+        else
+        begin
+          field.SetValue(objValue.AsObject, fieldValue);
+        end;
+
         continue;
       end;
     end;
@@ -1481,6 +1491,19 @@ begin
             context.AddHeapObject(fieldValue.AsObject);
           end;
           context.PopPath;
+
+          // set the value in the resulting object
+          if isRecord then
+          begin
+            field.SetValue(objValue.GetReferenceToRawData, fieldValue);
+          end
+          else
+          begin
+            field.SetValue(objValue.AsObject, fieldValue);
+          end;
+
+          continue;
+
         end
         else
         begin
