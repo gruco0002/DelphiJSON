@@ -7,14 +7,19 @@ The library is based on Delphis `System.RTTI` and `System.JSON` and has no non-s
 The test framework used to develop and test the library is `DUnitX`, but it is not required if you just want to use the library.
 
 ## Why
-The standard JSON (de)serialization provided with `System.JSON` is robust, but has its problems with arbitrary data formats.
-Furthermore it does not allow for an easy Opt-In/Out for data fields that should not be (de)serialized.
+The JSON (de)serialization using only `System.JSON` is a tideous job, since every field has to be filled in by hand.
+The standard JSON (de)serialization provided with `REST.Json.TJson` is robust and can (de)serialize JSON into Delphi data types. But it has some problems with arbitrary data formats. 
+
+Furthermore it does not allow for an easy Opt-In/Out for data fields that should not be (de)serialized. Additionally the
+JSON field names are tied to the Delphi source code, which can lead to problems.
 In order to gain more control over the whole process, this library was developed.
 It allows for explicit JSON names, needs an explicit opt-in to (de)serialize data and supports types like TDateTime and most of the `System.Generics.Collections` classes.
 
-Decoupling the implementation names of your Delphi objects or records from the JSON name is especially helpful for consistency.
+Decoupling the implementation names of your Delphi objects or records from the JSON name is especially helpful for consistency and can be seen as improving on the principle 'seperation of concerns'.
 E.g. you provide a JSON api with your application and at some point a simple refactoring, i.e. renaming a field of a class somewhere in the source code, causes your api to change, since the name of the implemented field was tied to the name used in (de)serialization.
-By using explicit JSON names this would not happen by accident, allowing for a more consistent api.
+By using explicit JSON names this would not happen by accident, allowing for a more consistent api and less errors.
+
+By introducing explicit naming, converters, default values, null checks, (not) required values and other things using attributes, this library tries to improve upon the named problems, make it easier for developers to get started with JSON (de)serialization and helps to abstract the (de)serialization logic away from the underlying data model and its business logic leading to cleaner and more readable code.
 
 ## Getting Started
 
