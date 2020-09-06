@@ -194,18 +194,20 @@ type
   end;
 
   /// <summary>
-  /// Defines a generator for a default value for a field that is used during deserialization.
+  /// Defines an abstract generator for a default value for a field that is used
+  /// during deserialization. To use the attribute, derive a custom non generic
+  /// generator that implementes the [Generator] function and annotate the
+  /// appropriate field.
+  /// Be sure to use the correct type [T].
   /// The default value is used if the field is not defined in the given JSON object.
   /// The generator is called during the deserialization.
   /// This attribute has no effect if not used together with either the [DJDefaultOnNilAttribute] or the [DJRequiredAttribute].
   /// </summary>
   DJDefaultValueCreatorAttribute<T> = class(IDJDefaultValue)
-  private
-    generator: TFunc<T>;
   protected
-    function GetValue: TValue; override;
+    function GetValue: TValue; override; final;
   public
-    constructor Create(const generator: TFunc<T>);
+    function Generator: T; virtual; abstract;
   end;
 
   /// <summary>
@@ -1920,14 +1922,9 @@ end;
 
 { DJDefaultValueCreatorAttribute<T> }
 
-constructor DJDefaultValueCreatorAttribute<T>.Create(const generator: TFunc<T>);
-begin
-  self.generator := generator;
-end;
-
 function DJDefaultValueCreatorAttribute<T>.GetValue: TValue;
 begin
-  Result := TValue.From<T>(generator());
+  Result := TValue.From<T>(Generator());
 end;
 
 { DJRequiredAttribute }

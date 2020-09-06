@@ -3,7 +3,7 @@ unit DefaultValueTests;
 interface
 
 uses
-  DUnitX.TestFramework, DelphiJSON;
+  DUnitX.TestFramework, DelphiJSON, System.Generics.Collections;
 
 type
 
@@ -33,6 +33,22 @@ type
 
   end;
 
+  TCustomListGenerator = class(DJDefaultValueCreatorAttribute < TList <
+    String >> )
+  public
+    function Generator: TList<String>; override;
+  end;
+
+  [DJSerializable]
+  TAnother = class
+  public
+    [DJValue('messages')]
+    [DJRequired(false)]
+    [TCustomListGenerator]
+    messages: TList<String>;
+
+  end;
+
   [TestFixture]
   TDefaultValueTests = class(TObject)
   public
@@ -43,9 +59,21 @@ type
     [Test]
     procedure Test2;
 
+    [Test]
+    procedure TestGenerator;
+
+    [Test]
+    procedure TestGenerator2;
+
   end;
 
 implementation
+
+function Generator: TObject;
+begin
+  Result := TList<String>.Create();
+  (Result as TList<String>).Add('Wow');
+end;
 
 { TDefaultValueTests }
 
@@ -80,6 +108,50 @@ begin
 
   tmp.Free;
 
+end;
+
+procedure TDefaultValueTests.TestGenerator;
+const
+  res = '{}';
+var
+  tmp: TAnother;
+begin
+
+  tmp := DelphiJSON<TAnother>.Deserialize(res);
+
+  Assert.IsNotNull(tmp.messages);
+  Assert.AreEqual(1, tmp.messages.Count);
+  Assert.AreEqual('Yeah!', tmp.messages[0]);
+
+  tmp.messages.Free;
+  tmp.Free;
+
+end;
+
+procedure TDefaultValueTests.TestGenerator2;
+const
+  res = '{ "messages": ["abc", "def"] }';
+var
+  tmp: TAnother;
+begin
+
+  tmp := DelphiJSON<TAnother>.Deserialize(res);
+
+  Assert.IsNotNull(tmp.messages);
+  Assert.AreEqual(2, tmp.messages.Count);
+  Assert.AreEqual('abc', tmp.messages[0]);
+  Assert.AreEqual('def', tmp.messages[1]);
+
+  tmp.messages.Free;
+  tmp.Free;
+end;
+
+{ TEmptyListGenerator }
+
+function TCustomListGenerator.Generator: TList<String>;
+begin
+  Result := TList<String>.Create;
+  Result.Add('Yeah!');
 end;
 
 initialization
