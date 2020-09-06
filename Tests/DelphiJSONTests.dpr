@@ -19,7 +19,8 @@ uses
   EnumerableTests in 'EnumerableTests.pas',
   RecordTests in 'RecordTests.pas',
   DateAndTimeTests in 'DateAndTimeTests.pas',
-  DefaultValueTests in 'DefaultValueTests.pas';
+  DefaultValueTests in 'DefaultValueTests.pas',
+  ConverterTests in 'ConverterTests.pas';
 
 var
   runner: ITestRunner;
