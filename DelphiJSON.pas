@@ -270,6 +270,7 @@ type
     path: String;
     errorMessage: String;
     constructor Create(errorMessage: String; path: String);
+    function Clone: EDJError; virtual;
   end;
 
   /// <summary>
@@ -1693,7 +1694,7 @@ begin
     on e: EDJError do
     begin
       val.Free;
-      raise e;
+      raise e.Clone;
     end;
   end;
   val.Free;
@@ -1726,7 +1727,7 @@ begin
       context.FreeAllHeapObjects;
       context.Free;
       createdSettings.Free;
-      raise e;
+      raise e.Clone;
     end;
   end;
 
@@ -1747,7 +1748,7 @@ begin
     on e: EDJError do
     begin
       JsonValue.Free;
-      raise e;
+      raise e.Clone
     end;
   end;
   JsonValue.Free;
@@ -1779,7 +1780,7 @@ begin
       context.FreeAllHeapObjects;
       context.Free;
       createdSettings.Free;
-      raise e;
+      raise e.Clone
     end;
   end;
 
@@ -1813,6 +1814,7 @@ begin
   self.path.Free;
   self.path := nil;
   self.RTTI.Free;
+  self.heapAllocatedObjects.Clear;
   self.heapAllocatedObjects.Free;
   self.heapAllocatedObjects := nil;
 end;
@@ -1827,8 +1829,8 @@ begin
     freed := heapAllocatedObjects[obj];
     if not freed then
     begin
-      obj.Free;
       heapAllocatedObjects[obj] := true;
+      obj.Free;
     end;
   end;
 end;
@@ -1936,6 +1938,11 @@ begin
 end;
 
 { EDJError }
+
+function EDJError.Clone: EDJError;
+begin
+  Result := EDJError.Create(self.errorMessage, self.path);
+end;
 
 constructor EDJError.Create(errorMessage, path: String);
 begin
