@@ -278,13 +278,19 @@ type
   /// <summary>
   /// This error is raised if an required field is not found in the JSON object.
   /// </summary>
-  EDJRequiredError = class(EDJError);
+  EDJRequiredError = class(EDJError)
+  public
+    function Clone: EDJError; override;
+  end;
 
   /// <summary>
   /// This error is raised if a field is nil/null although it is annotated with
   /// the [DJNonNilableAttribute].
   /// </summary>
-  EDJNilError = class(EDJError);
+  EDJNilError = class(EDJError)
+  public
+    function Clone: EDJError; override;
+  end;
 
   TSerContext = class
   private
@@ -1958,6 +1964,20 @@ end;
 function DJConverterAttribute<T>.ToJSONinternal(value: TValue): TJSONValue;
 begin
   Result := ToJSON(value.AsType<T>());
+end;
+
+{ EDJRequiredError }
+
+function EDJRequiredError.Clone: EDJError;
+begin
+  Result := EDJRequiredError.Create(self.errorMessage, self.path);
+end;
+
+{ EDJNilError }
+
+function EDJNilError.Clone: EDJError;
+begin
+  Result := EDJNilError.Create(self.errorMessage, self.path);
 end;
 
 end.

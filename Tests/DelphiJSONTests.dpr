@@ -21,7 +21,8 @@ uses
   DateAndTimeTests in 'DateAndTimeTests.pas',
   DefaultValueTests in 'DefaultValueTests.pas',
   ConverterTests in 'ConverterTests.pas',
-  ConstructorTests in 'ConstructorTests.pas';
+  ConstructorTests in 'ConstructorTests.pas',
+  NonNilableTests in 'NonNilableTests.pas';
 
 var
   runner: ITestRunner;
