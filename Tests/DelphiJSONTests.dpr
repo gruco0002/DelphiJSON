@@ -20,7 +20,8 @@ uses
   RecordTests in 'RecordTests.pas',
   DateAndTimeTests in 'DateAndTimeTests.pas',
   DefaultValueTests in 'DefaultValueTests.pas',
-  ConverterTests in 'ConverterTests.pas';
+  ConverterTests in 'ConverterTests.pas',
+  ConstructorTests in 'ConstructorTests.pas';
 
 var
   runner: ITestRunner;
