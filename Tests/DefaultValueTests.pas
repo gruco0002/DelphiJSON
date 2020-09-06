@@ -14,6 +14,7 @@ type
     [DJValue('str')]
     [DJRequired(false)]
     [DJDefaultValue('Hello World')]
+    [DJDefaultOnNilAttribute]
     str: String;
 
     [DJValue('b')]
@@ -45,6 +46,7 @@ type
     [DJValue('messages')]
     [DJRequired(false)]
     [TCustomListGenerator]
+    [DJDefaultOnNilAttribute]
     messages: TList<String>;
 
   end;
@@ -64,6 +66,12 @@ type
 
     [Test]
     procedure TestGenerator2;
+
+    [Test]
+    procedure TestDefaultOnNil1;
+
+    [Test]
+    procedure TestDefaultOnNil2;
 
   end;
 
@@ -108,6 +116,40 @@ begin
 
   tmp.Free;
 
+end;
+
+procedure TDefaultValueTests.TestDefaultOnNil1;
+const
+  res = '{ "str": null, "s": 123.123 }';
+var
+  tmp: TTestClass;
+begin
+  tmp := DelphiJSON<TTestClass>.Deserialize(res);
+
+  Assert.AreEqual('Hello World', tmp.str);
+  Assert.AreEqual(true, tmp.b);
+  Assert.AreEqual(156, tmp.i);
+  Assert.AreEqual(single(123.123), tmp.s);
+
+  tmp.Free;
+
+end;
+
+procedure TDefaultValueTests.TestDefaultOnNil2;
+const
+  res = '{ "messages": null }';
+var
+  tmp: TAnother;
+begin
+
+  tmp := DelphiJSON<TAnother>.Deserialize(res);
+
+  Assert.IsNotNull(tmp.messages);
+  Assert.AreEqual(1, tmp.messages.Count);
+  Assert.AreEqual('Yeah!', tmp.messages[0]);
+
+  tmp.messages.Free;
+  tmp.Free;
 end;
 
 procedure TDefaultValueTests.TestGenerator;
