@@ -93,6 +93,7 @@
         <DCCReference Include="EnumerableTests.pas"/>
         <DCCReference Include="RecordTests.pas"/>
         <DCCReference Include="DateAndTimeTests.pas"/>
+        <DCCReference Include="DefaultValueTests.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

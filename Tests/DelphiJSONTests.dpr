@@ -7,9 +7,9 @@ program DelphiJSONTests;
 uses
   FastMM4,
   System.SysUtils,
-{$IFDEF TESTINSIGHT}
+  {$IFDEF TESTINSIGHT}
   TestInsight.DUnitX,
-{$ENDIF }
+  {$ENDIF }
   DUnitX.Loggers.Console,
   DUnitX.Loggers.Xml.NUnit,
   DUnitX.TestFramework,
@@ -18,7 +18,8 @@ uses
   JSONComparerTests in 'JSONComparerTests.pas',
   EnumerableTests in 'EnumerableTests.pas',
   RecordTests in 'RecordTests.pas',
-  DateAndTimeTests in 'DateAndTimeTests.pas';
+  DateAndTimeTests in 'DateAndTimeTests.pas',
+  DefaultValueTests in 'DefaultValueTests.pas';
 
 var
   runner: ITestRunner;

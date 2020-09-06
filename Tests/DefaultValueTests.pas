@@ -29,7 +29,7 @@ type
     [DJValue('s')]
     [DJRequired(false)]
     [DJDefaultValue(single(0.56))]
-    s: Single;
+    s: single;
 
   end;
 
@@ -39,6 +39,9 @@ type
 
     [Test]
     procedure Test1;
+
+    [Test]
+    procedure Test2;
 
   end;
 
@@ -60,6 +63,23 @@ begin
   Assert.AreEqual(single(0.56), tmp.s);
 
   tmp.Free;
+end;
+
+procedure TDefaultValueTests.Test2;
+const
+  res = '{ "str": "Bye Bye!", "s": 123.123 }';
+var
+  tmp: TTestClass;
+begin
+  tmp := DelphiJSON<TTestClass>.Deserialize(res);
+
+  Assert.AreEqual('Bye Bye!', tmp.str);
+  Assert.AreEqual(true, tmp.b);
+  Assert.AreEqual(156, tmp.i);
+  Assert.AreEqual(single(123.123), tmp.s);
+
+  tmp.Free;
+
 end;
 
 initialization
