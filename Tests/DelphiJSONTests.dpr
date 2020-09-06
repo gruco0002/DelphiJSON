@@ -22,7 +22,8 @@ uses
   DefaultValueTests in 'DefaultValueTests.pas',
   ConverterTests in 'ConverterTests.pas',
   ConstructorTests in 'ConstructorTests.pas',
-  NonNilableTests in 'NonNilableTests.pas';
+  NonNilableTests in 'NonNilableTests.pas',
+  RequiredTests in 'RequiredTests.pas';
 
 var
   runner: ITestRunner;
