@@ -130,6 +130,11 @@ begin
 end;
 ```
 
+## Examples and Documentation
+Examples and documentation can be found in the [EXAMPLES.md](EXAMPLES.md) file.
+Another good source for information is the interface part of the library's
+source code in the `DelphiJSON.pas` file and the test cases in the `Tests` folder.
+
 ## Further Information
 This project/library is licensed under the MIT License (see `LICENSE` file).
 If you find bugs, memory leaks or other errors feel free to open an issue.
