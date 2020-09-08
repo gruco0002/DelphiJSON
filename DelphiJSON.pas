@@ -703,8 +703,16 @@ begin
     end
     else
     begin
-      // use the default serialization
-      serializedField := SerializeInternal(fieldValue, context);
+      if fieldValue.IsObject and (fieldValue.AsObject = nil) then
+      begin
+        // field is nil and allowed to be nil, hence return a json null
+        serializedField := TJSONNull.Create;
+      end
+      else
+      begin
+        // use the default serialization
+        serializedField := SerializeInternal(fieldValue, context);
+      end;
     end;
     context.PopPath;
 
@@ -1531,8 +1539,16 @@ begin
     end
     else
     begin
-      // default deserialization
-      fieldValue := DeserializeInternal(JsonValue, field.FieldType, context);
+      if JsonValue is TJSONNull then
+      begin
+        // field is allowed to be null and is null, hence set it to the empty value
+        fieldValue := TValue.Empty;
+      end
+      else
+      begin
+        // default deserialization
+        fieldValue := DeserializeInternal(JsonValue, field.FieldType, context);
+      end;
     end;
     context.PopPath;
 
