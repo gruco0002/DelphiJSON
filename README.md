@@ -6,6 +6,8 @@ An explicit and configurable single file JSON library for Delphi that is based o
 The library is based on Delphis `System.RTTI` and `System.JSON` and has no non-standard dependencies.
 The test framework used to develop and test the library is `DUnitX`, but it is not required if you just want to use the library.
 
+Tested with: `Delphi 10.3 Community Edition`
+
 ## Why
 The JSON (de)serialization using only `System.JSON` is a tideous job, since every field has to be filled in by hand.
 The standard JSON (de)serialization provided with `REST.Json.TJson` is robust and can (de)serialize JSON into Delphi data types. But it has some problems with arbitrary data formats. 
