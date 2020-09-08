@@ -106,14 +106,12 @@ begin
     procedure
     begin
       tmp := DelphiJSON<TTestSettings>.Deserialize(res, settings);
-
-      Assert.AreEqual('', tmp.str);
-      Assert.AreEqual(Single(9.23), tmp.f);
-      Assert.AreEqual(0, tmp.i);
-
-      tmp.Free;
     end, EDJRequiredError);
+  Assert.AreEqual('', tmp.str);
+  Assert.AreEqual(Single(42.42), tmp.f);
+  Assert.AreEqual(0, tmp.i);
 
+  tmp.Free;
   settings.Free;
 end;
 
