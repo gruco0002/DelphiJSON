@@ -23,7 +23,7 @@ By introducing explicit naming, converters, default values, null checks, (not) r
 
 ## Getting Started
 
-Since this is a single source file library, it is sufficient if you just download the `DelphiJSON.pas` file from a release or the master branch of the repository.
+Since this is a single source file library, it is sufficient if you just download the `DelphiJSON.pas` file from a release (or if you are daring the master branch) of the repository.
 
 ### Install
 You can either 'install' the library inside a specific project or for your whole environment.
