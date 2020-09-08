@@ -57,8 +57,10 @@ begin
     procedure
     begin
       att := DelphiJSON<TAttr>.Deserialize(res);
-      att.Free;
+
     end, EDJError);
+  att.Free;
+  att := nil;
 
   settings := TDJSettings.Default;
   settings.RequireSerializableAttributeForNonRTLClasses := true;
@@ -71,23 +73,24 @@ begin
     procedure
     begin
       att := DelphiJSON<TAttr>.Deserialize(res, settings);
-      att.Free;
     end, EDJError);
-
+  att.Free;
+  att := nil;
   settings.RequireSerializableAttributeForNonRTLClasses := false;
   Assert.WillNotRaise(
     procedure
     begin
       noAtt := DelphiJSON<TNoAttr>.Deserialize(res, settings);
-      noAtt.Free;
+
     end, EDJError);
+  noAtt.Free;
+  noAtt := nil;
   Assert.WillNotRaise(
     procedure
     begin
       att := DelphiJSON<TAttr>.Deserialize(res, settings);
-      att.Free;
     end, EDJError);
-
+  att.Free;
   settings.Free;
 end;
 
@@ -116,9 +119,10 @@ begin
     procedure
     begin
       result := DelphiJSON<TAttr>.SerializeJ(att);
-      Assert.IsTrue(JSONEquals(result, desired));
-      result.Free;
+
     end, EDJError);
+  Assert.IsTrue(JSONEquals(result, desired));
+  result.Free;
 
   settings := TDJSettings.Default;
   settings.RequireSerializableAttributeForNonRTLClasses := true;
@@ -131,26 +135,28 @@ begin
     procedure
     begin
       result := DelphiJSON<TAttr>.SerializeJ(att, settings);
-      Assert.IsTrue(JSONEquals(result, desired));
-      result.Free;
+
     end, EDJError);
+  Assert.IsTrue(JSONEquals(result, desired));
+  result.Free;
 
   settings.RequireSerializableAttributeForNonRTLClasses := false;
   Assert.WillNotRaise(
     procedure
     begin
       result := DelphiJSON<TNoAttr>.SerializeJ(noAtt, settings);
-      Assert.IsTrue(JSONEquals(result, desired));
-      result.Free;
+
     end, EDJError);
+  Assert.IsTrue(JSONEquals(result, desired));
+  result.Free;
   Assert.WillNotRaise(
     procedure
     begin
       result := DelphiJSON<TAttr>.SerializeJ(att, settings);
-      Assert.IsTrue(JSONEquals(result, desired));
-      result.Free;
-    end, EDJError);
 
+    end, EDJError);
+  Assert.IsTrue(JSONEquals(result, desired));
+  result.Free;
   settings.Free;
   noAtt.Free;
   att.Free;
