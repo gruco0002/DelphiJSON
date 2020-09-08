@@ -103,6 +103,7 @@
         <DCCReference Include="DictionaryTests.pas"/>
         <DCCReference Include="ArrayTests.pas"/>
         <DCCReference Include="CycleTests.pas"/>
+        <DCCReference Include="AutoFreeTest.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

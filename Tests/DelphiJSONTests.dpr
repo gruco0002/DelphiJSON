@@ -28,7 +28,8 @@ uses
   ListTests in 'ListTests.pas',
   DictionaryTests in 'DictionaryTests.pas',
   ArrayTests in 'ArrayTests.pas',
-  CycleTests in 'CycleTests.pas';
+  CycleTests in 'CycleTests.pas',
+  AutoFreeTest in 'AutoFreeTest.pas';
 
 var
   runner: ITestRunner;

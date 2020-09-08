@@ -325,6 +325,8 @@ type
     // used to detect cycles during serialization
     objectTracker: TDictionary<TObject, Boolean>;
 
+    procedure NilAllReferencesRecursive(value: TValue);
+
   public
     RTTI: TRttiContext;
     settings: TDJSettings;
@@ -1892,6 +1894,17 @@ var
   obj: TObject;
   freed: Boolean;
 begin
+  // nil every reference to an object in a json value annotated fields in every
+  // data that was created by the (de)serializer
+  // this prevents double freeing due to objects being managed by their
+  // parent objects and additionally being freed here
+
+  for obj in heapAllocatedObjects.Keys do
+  begin
+    NilAllReferencesRecursive(TValue.From(obj));
+  end;
+
+  // free every heap object
   for obj in heapAllocatedObjects.Keys do
   begin
     freed := heapAllocatedObjects[obj];
@@ -1921,6 +1934,74 @@ begin
     Result := False;
   end;
   Result := self.objectTracker.ContainsKey(obj);
+end;
+
+procedure TSerContext.NilAllReferencesRecursive(value: TValue);
+var
+  dataType: TRttiType;
+  field: TRttiField;
+  attribute: TCustomAttribute;
+  found: Boolean;
+  fieldValue: TValue;
+begin
+  if not((value.TypeInfo.Kind = TTypeKind.tkRecord) or
+    (value.IsObject and (value.AsObject <> nil))) then
+  begin
+    // the value is neither an object nor a record
+    exit;
+  end;
+
+  dataType := RTTI.GetType(value.TypeInfo);
+
+  // checking all fields
+  for field in dataType.GetFields do
+  begin
+    found := False;
+    for attribute in field.GetAttributes do
+    begin
+      if attribute is DJValueAttribute then
+      begin
+        found := true;
+        break;
+      end;
+    end;
+
+    if not found then
+    begin
+      continue;
+    end;
+
+    // get the field value
+    if value.IsObject then
+    begin
+      // class object
+      fieldValue := field.GetValue(value.AsObject);
+    end
+    else
+    begin
+      // record
+      fieldValue := field.GetValue(value.GetReferenceToRawData);
+    end;
+
+    // nil the values of that field
+    NilAllReferencesRecursive(fieldValue);
+
+    // nil the field if it was an object
+    if fieldValue.IsObject then
+    begin
+      if value.IsObject then
+      begin
+        // class object
+        field.SetValue(value.AsObject, TValue.Empty);
+      end
+      else
+      begin
+        // record
+        field.SetValue(value.GetReferenceToRawData, TValue.Empty);
+      end;
+    end;
+  end;
+
 end;
 
 procedure TSerContext.PopPath;
