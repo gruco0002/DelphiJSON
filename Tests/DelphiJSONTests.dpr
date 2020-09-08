@@ -24,7 +24,8 @@ uses
   ConstructorTests in 'ConstructorTests.pas',
   NonNilableTests in 'NonNilableTests.pas',
   RequiredTests in 'RequiredTests.pas',
-  SerializableAttrTests in 'SerializableAttrTests.pas';
+  SerializableAttrTests in 'SerializableAttrTests.pas',
+  ListTests in 'ListTests.pas';
 
 var
   runner: ITestRunner;
