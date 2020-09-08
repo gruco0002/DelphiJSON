@@ -23,7 +23,8 @@ uses
   ConverterTests in 'ConverterTests.pas',
   ConstructorTests in 'ConstructorTests.pas',
   NonNilableTests in 'NonNilableTests.pas',
-  RequiredTests in 'RequiredTests.pas';
+  RequiredTests in 'RequiredTests.pas',
+  SerializableAttrTests in 'SerializableAttrTests.pas';
 
 var
   runner: ITestRunner;

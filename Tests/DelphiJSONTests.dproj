@@ -98,6 +98,7 @@
         <DCCReference Include="ConstructorTests.pas"/>
         <DCCReference Include="NonNilableTests.pas"/>
         <DCCReference Include="RequiredTests.pas"/>
+        <DCCReference Include="SerializableAttrTests.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
