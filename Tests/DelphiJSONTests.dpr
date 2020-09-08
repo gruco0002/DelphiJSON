@@ -25,7 +25,8 @@ uses
   NonNilableTests in 'NonNilableTests.pas',
   RequiredTests in 'RequiredTests.pas',
   SerializableAttrTests in 'SerializableAttrTests.pas',
-  ListTests in 'ListTests.pas';
+  ListTests in 'ListTests.pas',
+  DictionaryTests in 'DictionaryTests.pas';
 
 var
   runner: ITestRunner;
