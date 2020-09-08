@@ -469,8 +469,8 @@ begin
     // retrieve current pair
     currentPairValue := currentProperty.GetValue(enumerator.AsObject);
 
-    keyValue := keyField.GetValue(currentPairValue.AsObject);
-    valueValue := valueField.GetValue(currentPairValue.AsObject);
+    keyValue := keyField.GetValue(currentPairValue.GetReferenceToRawData);
+    valueValue := valueField.GetValue(currentPairValue.GetReferenceToRawData);
 
     keyString := keyValue.AsString;
 
@@ -548,21 +548,22 @@ begin
       exit;
     end;
 
-    if tmp.Name.StartsWith('TDictionary<string,', true) then
+    if tmp.Name.ToLower.StartsWith('tdictionary<system.string,', true) or
+      tmp.Name.ToLower.StartsWith('tdictionary<string,', true) then
     begin
       Result := true;
       output := SerTDictionaryStringKey(data.AsObject, dataType, context);
       exit;
     end;
 
-    if tmp.Name.StartsWith('TPair<', true) then
+    if tmp.Name.ToLower.StartsWith('tpair<', true) then
     begin
       Result := true;
       output := SerTPair(data, dataType, context);
       exit;
     end;
 
-    if tmp.Name.StartsWith('TEnumerable<', true) then
+    if tmp.Name.ToLower.StartsWith('tenumerable<', true) then
     begin
       Result := true;
       output := SerTEnumerable(data.AsObject, dataType, context);
@@ -1282,28 +1283,29 @@ begin
       exit;
     end;
 
-    if tmp.Name.StartsWith('TDictionary<string,', true) then
+    if tmp.Name.ToLower.StartsWith('tdictionary<system.string,', true) or
+      tmp.Name.ToLower.StartsWith('tdictionary<string,', true) then
     begin
       Result := true;
       DerTDictionaryStringKey(value, dataType, objOut, context);
       exit;
     end;
 
-    if tmp.Name.StartsWith('TDictionary<', true) then
+    if tmp.Name.ToLower.StartsWith('tdictionary<', true) then
     begin
       Result := true;
       DerTDictionary(value, dataType, objOut, context);
       exit;
     end;
 
-    if tmp.Name.StartsWith('TPair<', true) then
+    if tmp.Name.ToLower.StartsWith('tpair<', true) then
     begin
       Result := true;
       DerTPair(value, dataType, objOut, context);
       exit;
     end;
 
-    if tmp.Name.StartsWith('TEnumerable<', true) then
+    if tmp.Name.ToLower.StartsWith('tenumerable<', true) then
     begin
       Result := true;
       DerTEnumerable(value, dataType, objOut, context);
