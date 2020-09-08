@@ -302,6 +302,18 @@ type
     function Clone: EDJError; override;
   end;
 
+  /// <summary>
+  /// This error is raised if a reference cycle during serialization is
+  /// detected.
+  /// A reference cycle can occur if fields that are serialized point towards
+  /// objects that have already been serialized or are in the process of being
+  /// serialized.
+  /// </summary>
+  EDJCycleError = class(EDJError)
+  public
+    function Clone: EDJError; override;
+  end;
+
   TSerContext = class
   private
     path: TStack<string>;
@@ -309,6 +321,9 @@ type
     // keeps track of heap allocated objects in order to free them, if an error happens and no value can be returned
     // this is implemented to avoid memory leaks through invalid json or parameters / other issues
     heapAllocatedObjects: TDictionary<TObject, Boolean>;
+
+    // used to detect cycles during serialization
+    objectTracker: TDictionary<TObject, Boolean>;
 
   public
     RTTI: TRttiContext;
@@ -325,6 +340,9 @@ type
     procedure AddHeapObject(obj: TObject);
     procedure RemoveHeapObject(obj: TObject);
     procedure FreeAllHeapObjects;
+
+    procedure Track(obj: TObject);
+    function IsTracked(obj: TObject): Boolean;
 
     function ToString: string; override;
 
@@ -740,8 +758,19 @@ var
   dataType: TRttiType;
 begin
   // check for the type and call the appropriate subroutine for serialization
-
   dataType := context.RTTI.GetType(value.TypeInfo);
+
+  // check if it a object and
+  if value.IsObject then
+  begin
+    // check if the object was already / is in the process of being serialized
+    if context.IsTracked(value.AsObject) then
+    begin
+      raise EDJCycleError.Create('A cycle was detected during serialization!',
+        context.FullPath);
+    end;
+    context.Track(value.AsObject);
+  end;
 
   // checking if a special case handled the type of data
   if SerHandledSpecialCase(value, dataType, Result, context) then
@@ -1843,6 +1872,7 @@ begin
   self.path := TStack<string>.Create;
   self.RTTI := TRttiContext.Create;
   self.heapAllocatedObjects := TDictionary<TObject, Boolean>.Create;
+  self.objectTracker := TDictionary<TObject, Boolean>.Create;
 end;
 
 destructor TSerContext.Destroy;
@@ -1853,6 +1883,8 @@ begin
   self.heapAllocatedObjects.Clear;
   self.heapAllocatedObjects.Free;
   self.heapAllocatedObjects := nil;
+  self.objectTracker.Free;
+  self.objectTracker := nil;
 end;
 
 procedure TSerContext.FreeAllHeapObjects;
@@ -1882,6 +1914,15 @@ begin
   end;
 end;
 
+function TSerContext.IsTracked(obj: TObject): Boolean;
+begin
+  if obj = nil then
+  begin
+    Result := False;
+  end;
+  Result := self.objectTracker.ContainsKey(obj);
+end;
+
 procedure TSerContext.PopPath;
 begin
   path.Pop;
@@ -1905,6 +1946,15 @@ end;
 function TSerContext.ToString: string;
 begin
   Result := 'Context: { ' + FullPath + ' }';
+end;
+
+procedure TSerContext.Track(obj: TObject);
+begin
+  if obj = nil then
+  begin
+    exit;
+  end;
+  self.objectTracker.AddOrSetValue(obj, true);
 end;
 
 { TDJSettings }
@@ -2013,6 +2063,13 @@ end;
 function EDJWrongArraySizeError.Clone: EDJError;
 begin
   Result := EDJWrongArraySizeError.Create(self.errorMessage, self.path);
+end;
+
+{ EDJCycleError }
+
+function EDJCycleError.Clone: EDJError;
+begin
+  Result := EDJCycleError.Create(self.errorMessage, self.path);
 end;
 
 end.
