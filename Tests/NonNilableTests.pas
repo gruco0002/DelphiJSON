@@ -82,10 +82,9 @@ begin
     procedure
     begin
       tmp := DelphiJSON<TTest>.Deserialize(res, settings);
-      Assert.IsNull(tmp.list);
-      tmp.Free;
     end, EDJNilError);
-
+  Assert.IsNull(tmp.list);
+  tmp.Free;
   settings.Free;
 end;
 
@@ -109,13 +108,12 @@ begin
     procedure
     begin
       jValue := DelphiJSON<TTest>.SerializeJ(tmp, settings);
-      desired := TJSONObject.ParseJSONValue(res);
-      Assert.IsTrue(JsonComparer.JSONEquals(jValue, desired));
-
-      jValue.Free;
-      desired.Free;
     end, EDJNilError);
+  desired := TJSONObject.ParseJSONValue(res);
+  Assert.IsTrue(JsonComparer.JSONEquals(jValue, desired));
 
+  jValue.Free;
+  desired.Free;
   tmp.Free;
   settings.Free;
 end;

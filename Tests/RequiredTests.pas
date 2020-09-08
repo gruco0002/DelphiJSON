@@ -71,12 +71,11 @@ begin
     procedure
     begin
       tmp := DelphiJSON<TTestAttr>.Deserialize(res);
-
-      Assert.AreEqual('', tmp.str);
-      Assert.AreEqual(Single(9.23), tmp.f);
-
-      tmp.Free;
     end, EDJRequiredError);
+  Assert.AreEqual('', tmp.str);
+  Assert.AreEqual(Single(9.23), tmp.f);
+
+  tmp.Free;
 end;
 
 procedure TRequiredTests.TestRequiredAttrDesException;
