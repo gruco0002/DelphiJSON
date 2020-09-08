@@ -71,7 +71,7 @@ end;
 
 constructor TConstr1.FromJSON;
 begin
-  Assert.Pass();
+  //Assert.Pass();
 end;
 
 { TConstructorTests }
@@ -115,7 +115,7 @@ end;
 
 constructor TConstr2.Create;
 begin
-  Assert.Pass();
+  //Assert.Pass();
 end;
 
 constructor TConstr2.FromJSON;
@@ -127,7 +127,7 @@ end;
 
 constructor TConstr3.Create;
 begin
-  Assert.Pass();
+  //Assert.Pass();
 end;
 
 constructor TConstr3.FromJSON;
