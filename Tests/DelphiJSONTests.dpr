@@ -26,7 +26,8 @@ uses
   RequiredTests in 'RequiredTests.pas',
   SerializableAttrTests in 'SerializableAttrTests.pas',
   ListTests in 'ListTests.pas',
-  DictionaryTests in 'DictionaryTests.pas';
+  DictionaryTests in 'DictionaryTests.pas',
+  ArrayTests in 'ArrayTests.pas';
 
 var
   runner: ITestRunner;

@@ -292,6 +292,16 @@ type
     function Clone: EDJError; override;
   end;
 
+  /// <summary>
+  /// This error is raised if a fixed sized array is being deserialized and the
+  /// size of the array in the JSON data does not match the delphi fixed array
+  /// size.
+  /// </summary>
+  EDJWrongArraySizeError = class(EDJError)
+  public
+    function Clone: EDJError; override;
+  end;
+
   TSerContext = class
   private
     path: TStack<string>;
@@ -957,7 +967,7 @@ begin
     staticType := TRttiArrayType(dataType);
     if staticType.TotalElementCount <> value.Count then
     begin
-      raise EDJError.Create
+      raise EDJWrongArraySizeError.Create
         ('Element count of the given JSON array does not match the size of a static array. ',
         context.FullPath);
     end;
@@ -1996,6 +2006,13 @@ end;
 function EDJNilError.Clone: EDJError;
 begin
   Result := EDJNilError.Create(self.errorMessage, self.path);
+end;
+
+{ EDJWrongArraySizeError }
+
+function EDJWrongArraySizeError.Clone: EDJError;
+begin
+  Result := EDJWrongArraySizeError.Create(self.errorMessage, self.path);
 end;
 
 end.
