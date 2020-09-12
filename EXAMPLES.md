@@ -157,6 +157,7 @@ The different types can be used to track down different error causes:
 * EDJNilError
 * EDJWrongArraySizeError
 * EDJCycleError
+* EDJFormatError
 
 You can catch certain errors to track down incorrect input data (e.g. missing fields, etc.):
 ```pascal
@@ -206,6 +207,11 @@ This error is raised if a reference cycle during serialization is detected.
 A reference cycle can occur if fields that are serialized point towards
 objects that have already been serialized or are in the process of being
 serialized.
+### EDJFormatError
+This error is raised if a wrong format of the JSON data is provided during
+deserialization.
+E.g.: A DateTime string should be deserialized but does not meet the
+requirement of the ISO 8601 format.
 
 ## DJConstructorAttribute
 This attribute can be used to explicitly use a constructor of a class for
