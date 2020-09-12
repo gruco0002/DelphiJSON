@@ -23,6 +23,9 @@ type
     [Test]
     procedure TestUTCSettingsDeserialization;
 
+    [Test]
+    procedure TestFormatError;
+
   end;
 
 implementation
@@ -61,6 +64,39 @@ begin
   desired.Free;
   ser.Free;
 
+end;
+
+procedure TDateAndTimeTests.TestFormatError;
+const
+  res = '"2020-09-12T10:40:42.153+02:00"';
+  resInvalid = '"2020-09-12T-10:40:42.153+02:00"';
+var
+  dt: TDateTime;
+begin
+
+  Assert.WillRaise(
+    procedure
+    begin
+      dt := DelphiJSON<TDateTime>.Deserialize(resInvalid);
+    end, EDJFormatError);
+
+  Assert.WillRaise(
+    procedure
+    begin
+      dt := DelphiJSON<TDateTime>.Deserialize('"hello World"');
+    end, EDJFormatError);
+
+  Assert.WillRaise(
+    procedure
+    begin
+      dt := DelphiJSON<TDateTime>.Deserialize('""');
+    end, EDJFormatError);
+
+  Assert.WillNotRaise(
+    procedure
+    begin
+      dt := DelphiJSON<TDateTime>.Deserialize(res);
+    end, EDJFormatError);
 end;
 
 procedure TDateAndTimeTests.TestUTCSettingsDeserialization;

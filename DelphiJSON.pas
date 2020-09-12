@@ -316,6 +316,17 @@ type
     function Clone: EDJError; override;
   end;
 
+  /// <summary>
+  /// This error is raised if a wrong format of the JSON data is provided during
+  /// deserialization.
+  /// E.g.: A DateTime string should be deserialized but does not meet the
+  /// requirement of the ISO 8601 format.
+  /// </summary>
+  EDJFormatError = class(EDJError)
+  public
+    function Clone: EDJError; override;
+  end;
+
   TSerContext = class
   private
     path: TStack<string>;
@@ -1302,12 +1313,23 @@ begin
 
   if not(value is TJSONString) then
   begin
-    raise EDJError.Create('Expected a JSON string in date time format. ',
+    raise EDJError.Create
+      ('Expected a JSON string in date time ISO 8601 format.',
       context.FullPath);
   end;
   jStr := value as TJSONString;
   str := jStr.value;
-  dt := ISO8601ToDate(str, context.settings.DateTimeReturnUTC);
+  try
+    dt := ISO8601ToDate(str, context.settings.DateTimeReturnUTC);
+  except
+    on E: Exception do
+    begin
+      raise EDJFormatError.Create
+        ('Invalid DateTime format was provided. Expected an ISO 8601 ' +
+        'formatted string.', context.path.ToString);
+    end;
+  end;
+
   objOut := TValue.From(dt);
 end;
 
@@ -1760,10 +1782,10 @@ begin
     val := TJSONObject.ParseJSONValue(data, true, true);
     Result := DeserializeJ(val, settings);
   except
-    on e: EDJError do
+    on E: EDJError do
     begin
       val.Free;
-      raise e.Clone;
+      raise E.Clone;
     end;
   end;
   val.Free;
@@ -1791,12 +1813,12 @@ begin
     rttiType := context.RTTI.GetType(System.TypeInfo(T));
     res := DeserializeInternal(data, rttiType, context);
   except
-    on e: EDJError do
+    on E: EDJError do
     begin
       context.FreeAllHeapObjects;
       context.Free;
       createdSettings.Free;
-      raise e.Clone;
+      raise E.Clone;
     end;
   end;
 
@@ -1814,10 +1836,10 @@ begin
     JsonValue := SerializeJ(data, settings);
     Result := JsonValue.ToJSON;
   except
-    on e: EDJError do
+    on E: EDJError do
     begin
       JsonValue.Free;
-      raise e.Clone
+      raise E.Clone
     end;
   end;
   JsonValue.Free;
@@ -1844,12 +1866,12 @@ begin
     valueObject := TValue.From<T>(data);
     Result := SerializeInternal(valueObject, context);
   except
-    on e: EDJError do
+    on E: EDJError do
     begin
       context.FreeAllHeapObjects;
       context.Free;
       createdSettings.Free;
-      raise e.Clone
+      raise E.Clone
     end;
   end;
 
@@ -2153,6 +2175,13 @@ end;
 function EDJCycleError.Clone: EDJError;
 begin
   Result := EDJCycleError.Create(self.errorMessage, self.path);
+end;
+
+{ EDJFormatError }
+
+function EDJFormatError.Clone: EDJError;
+begin
+  Result := EDJFormatError.Create(self.errorMessage, self.path);
 end;
 
 end.
