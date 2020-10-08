@@ -44,7 +44,7 @@ function TUpperConv.FromJSON(value: TJSONValue): String;
 begin
   if not(value is TJSONString) then
   begin
-    raise EDJError.Create('wrong type', '');
+    raise EDJError.Create('wrong type', nil);
   end;
   Result := (value as TJSONString).value.toUpper;
 end;
