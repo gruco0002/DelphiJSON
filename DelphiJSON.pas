@@ -61,6 +61,16 @@ type
     RequiredByDefault: Boolean;
 
     /// <summary>
+    /// If set to true, the (de)serializer assumes that TDictionary's that have
+    /// string set as their key type are represented by JSON objects and
+    /// (de)serializes them respectively. If set to false, those TDictionary's
+    /// will be (de)serialized like other dictionaries (to/from a JSON array of
+    /// key-value objects).
+    /// The default value is true.
+    /// </summary>
+    TreatStringDictionaryAsObject: Boolean;
+
+    /// <summary>
     /// Creates the default settings for (de)serialization.
     /// </summary>
     constructor Default;
@@ -616,8 +626,9 @@ begin
       exit;
     end;
 
-    if tmp.Name.ToLower.StartsWith('tdictionary<system.string,', true) or
-      tmp.Name.ToLower.StartsWith('tdictionary<string,', true) then
+    if context.settings.TreatStringDictionaryAsObject and
+      (tmp.Name.ToLower.StartsWith('tdictionary<system.string,', true) or
+      tmp.Name.ToLower.StartsWith('tdictionary<string,', true)) then
     begin
       Result := true;
       output := SerTDictionaryStringKey(data.AsObject, dataType, context);
@@ -1366,8 +1377,9 @@ begin
       exit;
     end;
 
-    if tmp.Name.ToLower.StartsWith('tdictionary<system.string,', true) or
-      tmp.Name.ToLower.StartsWith('tdictionary<string,', true) then
+    if context.settings.TreatStringDictionaryAsObject and
+      (tmp.Name.ToLower.StartsWith('tdictionary<system.string,', true) or
+      tmp.Name.ToLower.StartsWith('tdictionary<string,', true)) then
     begin
       Result := true;
       DerTDictionaryStringKey(value, dataType, objOut, context);
@@ -2085,6 +2097,7 @@ begin
   DateTimeReturnUTC := true;
   IgnoreNonNillable := False;
   RequiredByDefault := true;
+  TreatStringDictionaryAsObject := true;
 end;
 
 { DJDefaultValueAttribute }
