@@ -104,6 +104,7 @@
         <DCCReference Include="ArrayTests.pas"/>
         <DCCReference Include="CycleTests.pas"/>
         <DCCReference Include="AutoFreeTest.pas"/>
+        <DCCReference Include="ErrorTests.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

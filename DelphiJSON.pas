@@ -278,6 +278,7 @@ type
     constructor Create(errorMessage: String; context: TSerContext); overload;
     function Clone: EDJError; virtual;
     destructor Destroy; override;
+    function FullPath: string;
   private
     constructor Create(errorMessage: String;
       const path: TList<String>); overload;
@@ -1576,6 +1577,7 @@ begin
     begin
       if not nillable then
       begin
+        context.PushPath(jsonFieldName);
         raise EDJNilError.Create
           ('Field value must not be nil, but JSON was null for field with name "'
           + jsonFieldName + '". ', context);
@@ -2171,6 +2173,11 @@ begin
   self.path.Free;
   self.path := nil;
   inherited;
+end;
+
+function EDJError.FullPath: string;
+begin
+  Result := PathToString(path);
 end;
 
 { DJConverterAttribute<T> }
