@@ -26,6 +26,18 @@ type
     [Test]
     procedure TestFormatError;
 
+    [Test]
+    procedure TestTTimeSer;
+
+    [Test]
+    procedure TestTTimeDer;
+
+    [Test]
+    procedure TestTDateSer;
+
+    [Test]
+    procedure TestTDateDer;
+
   end;
 
 implementation
@@ -97,6 +109,66 @@ begin
     begin
       dt := DelphiJSON<TDateTime>.Deserialize(res);
     end, EDJFormatError);
+end;
+
+procedure TDateAndTimeTests.TestTDateDer;
+const
+  res = '"2020-10-05"';
+var
+  dt: TDate;
+  de: TDate;
+begin
+  dt := EncodeDate(2020, 10, 5);
+  de := DelphiJSON<TDate>.Deserialize(res);
+  Assert.AreEqual(dt, de);
+end;
+
+procedure TDateAndTimeTests.TestTDateSer;
+const
+  res = '1983-06-12';
+var
+  ser: TJSONValue;
+  desired: TJSONString;
+  data: TDate;
+begin
+  data := EncodeDate(1983, 6, 12);
+  desired := TJSONString.Create(res);
+  ser := DelphiJSON<TDate>.SerializeJ(data);
+
+  Assert.IsTrue(JSONEquals(desired, ser));
+
+  desired.Free;
+  ser.Free;
+end;
+
+procedure TDateAndTimeTests.TestTTimeDer;
+const
+  res = '"13:56:12.24"';
+var
+  dt: TTime;
+  de: TTime;
+begin
+  dt := EncodeTime(13, 56, 12, 24);
+  de := DelphiJSON<TTime>.Deserialize(res);
+  Assert.AreEqual(dt, de);
+end;
+
+procedure TDateAndTimeTests.TestTTimeSer;
+const
+  res = '04:03:42.568';
+var
+  ser: TJSONValue;
+  desired: TJSONString;
+  data: TTime;
+begin
+  data := EncodeTime(4, 3, 42, 568);
+  desired := TJSONString.Create(res);
+  ser := DelphiJSON<TTime>.SerializeJ(data);
+
+  Assert.IsTrue(JSONEquals(desired, ser));
+
+  desired.Free;
+  ser.Free;
 end;
 
 procedure TDateAndTimeTests.TestUTCSettingsDeserialization;

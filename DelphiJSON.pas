@@ -611,6 +611,34 @@ begin
   context.AddHeapObject(Result);
 end;
 
+function SerTDate(data: TValue; dataType: TRttiType; context: TSerContext)
+  : TJSONString;
+const
+  format = 'yyyy-mm-dd';
+var
+  dt: TDate;
+  str: string;
+begin
+  dt := data.AsType<TDate>();
+  DateTimeToString(str, format, dt);
+  Result := TJSONString.Create(str);
+  context.AddHeapObject(Result);
+end;
+
+function SerTTime(data: TValue; dataType: TRttiType; context: TSerContext)
+  : TJSONString;
+const
+  format = 'hh:nn:ss.z';
+var
+  dt: TTime;
+  str: string;
+begin
+  dt := data.AsType<TTime>();
+  DateTimeToString(str, format, dt);
+  Result := TJSONString.Create(str);
+  context.AddHeapObject(Result);
+end;
+
 function SerHandledSpecialCase(data: TValue; dataType: TRttiType;
   var output: TJSONValue; context: TSerContext): Boolean;
 var
@@ -623,6 +651,20 @@ begin
     begin
       Result := true;
       output := SerTDateTime(data, dataType, context);
+      exit;
+    end;
+
+    if tmp.Name.ToLower = 'tdate' then
+    begin
+      Result := true;
+      output := SerTDate(data, dataType, context);
+      exit;
+    end;
+
+    if tmp.Name.ToLower = 'ttime' then
+    begin
+      Result := true;
+      output := SerTTime(data, dataType, context);
       exit;
     end;
 
@@ -1362,6 +1404,76 @@ begin
   objOut := TValue.From(dt);
 end;
 
+procedure DerTDate(value: TJSONValue; dataType: TRttiType; var objOut: TValue;
+  context: TDerContext);
+const
+  format = 'yyyy-mm-dd';
+var
+  jStr: TJSONString;
+  str: string;
+  dt: TDate;
+  fmt: TFormatSettings;
+begin
+
+  if not(value is TJSONString) then
+  begin
+    raise EDJError.Create('Expected a JSON string in date format.', context);
+  end;
+  jStr := value as TJSONString;
+  str := jStr.value;
+  try
+    fmt := TFormatSettings.Create('en-US');
+    fmt.LongDateFormat := format;
+    fmt.ShortDateFormat := format;
+    fmt.DateSeparator := '-';
+    dt := StrToDateTime(str, fmt);
+  except
+    on E: Exception do
+    begin
+      raise EDJFormatError.Create
+        ('Invalid Date format was provided. Expected an "' + format +
+        '" formatted string.', context);
+    end;
+  end;
+
+  objOut := TValue.From(dt);
+end;
+
+procedure DerTTime(value: TJSONValue; dataType: TRttiType; var objOut: TValue;
+  context: TDerContext);
+const
+  format = 'hh:nn:ss.z';
+var
+  jStr: TJSONString;
+  str: string;
+  dt: TTime;
+  fmt: TFormatSettings;
+begin
+
+  if not(value is TJSONString) then
+  begin
+    raise EDJError.Create('Expected a JSON string in time format.', context);
+  end;
+  jStr := value as TJSONString;
+  str := jStr.value;
+  try
+    fmt := TFormatSettings.Create('en-US');
+    fmt.LongTimeFormat := format;
+    fmt.ShortTimeFormat := format;
+    fmt.TimeSeparator := ':';
+    dt := StrToDateTime(str, fmt);
+  except
+    on E: Exception do
+    begin
+      raise EDJFormatError.Create
+        ('Invalid DateTime format was provided. Expected an "' + format +
+        '" formatted string.', context);
+    end;
+  end;
+
+  objOut := TValue.From(dt);
+end;
+
 function DerHandledSpecialCase(value: TJSONValue; dataType: TRttiType;
   var objOut: TValue; context: TDerContext): Boolean;
 var
@@ -1374,6 +1486,20 @@ begin
     begin
       Result := true;
       DerTDateTime(value, dataType, objOut, context);
+      exit;
+    end;
+
+    if tmp.Name.ToLower = 'tdate' then
+    begin
+      Result := true;
+      DerTDate(value, dataType, objOut, context);
+      exit;
+    end;
+
+    if tmp.Name.ToLower = 'ttime' then
+    begin
+      Result := true;
+      DerTTime(value, dataType, objOut, context);
       exit;
     end;
 
