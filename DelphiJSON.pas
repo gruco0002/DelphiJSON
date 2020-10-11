@@ -71,6 +71,17 @@ type
     TreatStringDictionaryAsObject: Boolean;
 
     /// <summary>
+    /// If set to true, the deserializer ignores fields in the JSON data, that
+    /// are not used for deserialization (that have no counterpart in the delphi
+    /// data representation). If set to false the deserialization raises an
+    /// exception upon encountering unused fields.
+    /// The default value is true.
+    /// This value is ignored for a class or record if it is annotated with the
+    /// [DJNoUnusedJSONFieldsAttribute].
+    /// </summary>
+    AllowUnusedJSONFields: Boolean;
+
+    /// <summary>
     /// Creates the default settings for (de)serialization.
     /// </summary>
     constructor Default;
@@ -274,6 +285,21 @@ type
   public
     function ToJSON(value: T): TJSONValue; virtual; abstract;
     function FromJSON(value: TJSONValue): T; virtual; abstract;
+  end;
+
+  /// <summary>
+  /// Makes a class or record raise an error on deserialization if there are
+  /// fields in the JSON data, that are not explicitly mapped to a field in the
+  /// class or record (iff [noUnusedFields] is set to true).
+  /// If the [noUnusedFields] is set to false, such additional JSON fields are
+  /// ignored and no errors are raised
+  /// Overrides the [AllowUnusedJSONFields] setting for the annotated class or
+  /// record.
+  /// </summary>
+  DJNoUnusedJSONFieldsAttribute = class(TCustomAttribute)
+  public
+    noUnusedFields: Boolean;
+    constructor Create(const noUnusedFields: Boolean = true);
   end;
 
   TSerContext = class;
@@ -1561,6 +1587,10 @@ var
   defaultValue: IDJDefaultValue;
   nilIsDefault: Boolean;
   converter: IDJConverterInterface;
+
+  allowUnusedFields: Boolean;
+
+  fieldsUsed: integer;
 begin
 
   if isRecord then
@@ -1582,19 +1612,24 @@ begin
   jsonObject := value as TJSONObject;
 
   // handle a "standard" object and deserialize it
+  allowUnusedFields := context.settings.AllowUnusedJSONFields;
+  found := False;
+  for attribute in dataType.GetAttributes() do
+  begin
+    if attribute is DJSerializableAttribute then
+    begin
+      found := true;
+    end
+    else if attribute is DJNoUnusedJSONFieldsAttribute then
+    begin
+      allowUnusedFields := not(attribute as DJNoUnusedJSONFieldsAttribute)
+        .noUnusedFields;
+    end;
+  end;
 
   if context.settings.RequireSerializableAttributeForNonRTLClasses then
   begin
-    // Ensure the object has the serializable attribute. (Fields added later)
-    found := False;
-    for attribute in dataType.GetAttributes() do
-    begin
-      if attribute is DJSerializableAttribute then
-      begin
-        found := true;
-        break;
-      end;
-    end;
+    // Ensure the object has the serializable attribute.
     if not found then
     begin
       raise EDJError.Create
@@ -1603,6 +1638,7 @@ begin
     end;
   end;
 
+  fieldsUsed := 0;
   // getting fields from the object
   objectFields := dataType.GetFields;
   for field in objectFields do
@@ -1711,6 +1747,10 @@ begin
       end;
     end;
 
+    // use the json value provided
+    Inc(fieldsUsed);
+
+    // check if null is a valid json value
     if JsonValue is TJSONNull then
     begin
       if not nillable then
@@ -1786,6 +1826,15 @@ begin
       field.SetValue(objValue.AsObject, fieldValue);
     end;
 
+  end;
+
+  // check if there were unused fields and if that is not allowed
+  if not allowUnusedFields then
+  begin
+    if jsonObject.Count > fieldsUsed then
+    begin
+      raise EDJError.Create('JSON object contains unused fields.', context);
+    end;
   end;
 
   Result := objValue;
@@ -2224,6 +2273,7 @@ begin
   IgnoreNonNillable := False;
   RequiredByDefault := true;
   TreatStringDictionaryAsObject := true;
+  AllowUnusedJSONFields := true;
 end;
 
 { DJDefaultValueAttribute }
@@ -2364,6 +2414,13 @@ end;
 function EDJFormatError.Clone: EDJError;
 begin
   Result := EDJFormatError.Create(self.errorMessage, self.path);
+end;
+
+{ DJNoUnusedJSONFieldsAttribute }
+
+constructor DJNoUnusedJSONFieldsAttribute.Create(const noUnusedFields: Boolean);
+begin
+  self.noUnusedFields := noUnusedFields;
 end;
 
 end.
