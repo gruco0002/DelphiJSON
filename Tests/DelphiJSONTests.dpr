@@ -30,7 +30,8 @@ uses
   ArrayTests in 'ArrayTests.pas',
   CycleTests in 'CycleTests.pas',
   AutoFreeTest in 'AutoFreeTest.pas',
-  ErrorTests in 'ErrorTests.pas';
+  ErrorTests in 'ErrorTests.pas',
+  UnusedFieldsTests in 'UnusedFieldsTests.pas';
 
 var
   runner: ITestRunner;
