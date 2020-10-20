@@ -82,13 +82,13 @@ begin
     procedure
     begin
       deserialized := DelphiJSON<TTest2>.Deserialize(res2);
-    end, EDJError);
+    end, EDJUnusedFieldsError);
 
   Assert.WillRaise(
     procedure
     begin
       deserialized := DelphiJSON<TTest2>.Deserialize(res2, setting);
-    end, EDJError);
+    end, EDJUnusedFieldsError);
   setting.Free;
 end;
 
@@ -161,7 +161,7 @@ begin
     procedure
     begin
       deserialized := DelphiJSON<TTest>.Deserialize(res2, setting);
-    end, EDJError);
+    end, EDJUnusedFieldsError);
   setting.Free;
 end;
 

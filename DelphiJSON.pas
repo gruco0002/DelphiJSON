@@ -360,6 +360,17 @@ type
   end;
 
   /// <summary>
+  /// This error is raised if unused fields are discovered in the JSON data
+  /// during the deserialization and such fields are not allowed.
+  /// See the [DJNoUnusedJSONFieldsAttribute] or the [AllowUnusedJSONFields]
+  /// property of the [TDJSettings] for more information.
+  /// </summary>
+  EDJUnusedFieldsError = class(EDJError)
+  public
+    function Clone: EDJError; override;
+  end;
+
+  /// <summary>
   /// This error is raised if a wrong format of the JSON data is provided during
   /// deserialization.
   /// E.g.: A DateTime string should be deserialized but does not meet the
@@ -1833,7 +1844,8 @@ begin
   begin
     if jsonObject.Count > fieldsUsed then
     begin
-      raise EDJError.Create('JSON object contains unused fields.', context);
+      raise EDJUnusedFieldsError.Create
+        ('JSON object contains unused fields.', context);
     end;
   end;
 
@@ -2421,6 +2433,13 @@ end;
 constructor DJNoUnusedJSONFieldsAttribute.Create(const noUnusedFields: Boolean);
 begin
   self.noUnusedFields := noUnusedFields;
+end;
+
+{ EDJUnusedFieldsError }
+
+function EDJUnusedFieldsError.Clone: EDJError;
+begin
+  Result := EDJUnusedFieldsError.Create(self.errorMessage, self.path);
 end;
 
 end.
