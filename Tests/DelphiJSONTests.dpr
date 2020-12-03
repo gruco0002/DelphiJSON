@@ -31,7 +31,8 @@ uses
   CycleTests in 'CycleTests.pas',
   AutoFreeTest in 'AutoFreeTest.pas',
   ErrorTests in 'ErrorTests.pas',
-  UnusedFieldsTests in 'UnusedFieldsTests.pas';
+  UnusedFieldsTests in 'UnusedFieldsTests.pas',
+  JSONValueTests in 'JSONValueTests.pas';
 
 var
   runner: ITestRunner;
