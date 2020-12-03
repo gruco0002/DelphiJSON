@@ -676,6 +676,16 @@ begin
   context.AddHeapObject(Result);
 end;
 
+function SerTJSONValue(data: TValue; dataType: TRttiType; context: TSerContext)
+  : TJSONValue;
+var
+  original: TJSONValue;
+begin
+  original := data.AsType<TJSONValue>();
+  Result := original.Clone as TJSONValue;
+  context.AddHeapObject(Result);
+end;
+
 function SerHandledSpecialCase(data: TValue; dataType: TRttiType;
   var output: TJSONValue; context: TSerContext): Boolean;
 var
@@ -702,6 +712,13 @@ begin
     begin
       Result := true;
       output := SerTTime(data, dataType, context);
+      exit;
+    end;
+
+    if tmp.Name.ToLower = 'tjsonvalue' then
+    begin
+      Result := true;
+      output := SerTJSONValue(data, dataType, context);
       exit;
     end;
 
@@ -1511,6 +1528,16 @@ begin
   objOut := TValue.From(dt);
 end;
 
+procedure DerTJSONValue(value: TJSONValue; dataType: TRttiType;
+  var objOut: TValue; context: TDerContext);
+var
+  output: TJSONValue;
+begin
+  output := value.Clone as TJSONValue;
+  context.AddHeapObject(output);
+  objOut := TValue.From(output);
+end;
+
 function DerHandledSpecialCase(value: TJSONValue; dataType: TRttiType;
   var objOut: TValue; context: TDerContext): Boolean;
 var
@@ -1537,6 +1564,13 @@ begin
     begin
       Result := true;
       DerTTime(value, dataType, objOut, context);
+      exit;
+    end;
+
+    if tmp.Name.ToLower = 'tjsonvalue' then
+    begin
+      Result := true;
+      DerTJSONValue(value, dataType, objOut, context);
       exit;
     end;
 
