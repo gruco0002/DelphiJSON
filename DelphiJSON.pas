@@ -1776,18 +1776,20 @@ begin
             context.AddHeapObject(fieldValue.AsObject);
           end;
           context.PopPath;
+
+          // set the default value in the resulting object
+          if isRecord then
+          begin
+            field.SetValue(objValue.GetReferenceToRawData, fieldValue);
+          end
+          else
+          begin
+            field.SetValue(objValue.AsObject, fieldValue);
+          end;
+
         end;
 
-        // set the value in the resulting object
-        if isRecord then
-        begin
-          field.SetValue(objValue.GetReferenceToRawData, fieldValue);
-        end
-        else
-        begin
-          field.SetValue(objValue.AsObject, fieldValue);
-        end;
-
+        // we took care of this object (either by assigning a default value or by leaving it as it is)
         continue;
       end;
     end;
