@@ -32,7 +32,8 @@ uses
   AutoFreeTest in 'AutoFreeTest.pas',
   ErrorTests in 'ErrorTests.pas',
   UnusedFieldsTests in 'UnusedFieldsTests.pas',
-  JSONValueTests in 'JSONValueTests.pas';
+  JSONValueTests in 'JSONValueTests.pas',
+  RecordArrayTests in 'RecordArrayTests.pas';
 
 var
   runner: ITestRunner;

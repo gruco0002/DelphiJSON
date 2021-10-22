@@ -107,6 +107,7 @@
         <DCCReference Include="ErrorTests.pas"/>
         <DCCReference Include="UnusedFieldsTests.pas"/>
         <DCCReference Include="JSONValueTests.pas"/>
+        <DCCReference Include="RecordArrayTests.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
