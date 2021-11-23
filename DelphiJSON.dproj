@@ -78,6 +78,8 @@
         </DelphiCompile>
         <DCCReference Include="rtl.dcp"/>
         <DCCReference Include="DelphiJSON.pas"/>
+        <DCCReference Include="DelphiJSONAttributes.pas"/>
+        <DCCReference Include="DelphiJSONTypes.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
@@ -115,7 +117,7 @@
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
-                <DeployFile LocalName="..\..\..\Public\Documents\Embarcadero\Studio\20.0\Bpl\DelphiJSON.bpl" Configuration="Debug" Class="ProjectOutput">
+                <DeployFile LocalName="..\..\..\Public\Documents\Embarcadero\Studio\21.0\Bpl\DelphiJSON.bpl" Configuration="Debug" Class="ProjectOutput">
                     <Platform Name="Win32">
                         <RemoteName>DelphiJSON.bpl</RemoteName>
                         <Overwrite>true</Overwrite>

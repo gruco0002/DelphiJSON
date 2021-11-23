@@ -1,5 +1,7 @@
 <img align="right" alt="DelphiJSONLogo" src="https://github.com/gruco0002/DelphiJSON/blob/master/Logo/Logo_small.png?raw=true"></img>
 
+## Transition-Branch: Not for use in production, can fail tests and is often not compileable!
+
 # DelphiJSON
 An explicit and configurable single file JSON library for Delphi that is based on attributes and RTTI.
 
