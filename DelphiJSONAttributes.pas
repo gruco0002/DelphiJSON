@@ -11,6 +11,9 @@ unit DelphiJSONAttributes;
 
 interface
 
+uses
+  DelphiJSONTypes;
+
 type
 
   /// <summary>
@@ -50,12 +53,13 @@ type
 
   /// <summary>
   /// Internal interface used for default values.
+  /// Each inherited class should implement a function with the name 'GetValue'
+  /// that returns the respective default value.
   /// </summary>
   IDJDefaultValue = class(TCustomAttribute)
   protected
-    function GetValue: Variant; virtual; abstract;
+    function IsVariant: Boolean; virtual; abstract;
   end;
-
 
   /// <summary>
   /// Defines a default value for a field that is used during deserialization.
@@ -67,7 +71,9 @@ type
   private
     value: Variant;
   protected
-    function GetValue: Variant; override;
+    function IsVariant: Boolean; override;
+  public
+    function GetValue: Variant;
   public
     constructor Create(const value: string); overload;
     constructor Create(const value: integer); overload;
@@ -89,7 +95,9 @@ type
   /// </summary>
   DJDefaultValueCreatorAttribute<T> = class(IDJDefaultValue)
   protected
-    function GetValue: Variant; override; final;
+    function IsVariant: Boolean; override;
+  public
+    function GetValue: T;
   public
     function Generator: T; virtual; abstract;
   end;
@@ -121,8 +129,7 @@ type
   /// </summary>
   IDJConverterInterface = class(TCustomAttribute)
   protected
-    function ToJSONinternal(value: Variant): TJSONValue; virtual; abstract;
-    function FromJSONinternal(value: TJSONValue): Variant; virtual; abstract;
+    function Dummy: Boolean; virtual; abstract;
   end;
 
   /// <summary>
@@ -141,11 +148,10 @@ type
   /// </summary>
   DJConverterAttribute<T> = class(IDJConverterInterface)
   protected
-    function ToJSONinternal(value: Variant): TJSONValue; override;
-    function FromJSONinternal(value: TJSONValue): Variant; override;
+    function Dummy: Boolean; override; // This allows for RTTI identification
   public
-    function ToJSON(value: T): TJSONValue; virtual; abstract;
-    function FromJSON(value: TJSONValue): T; virtual; abstract;
+    procedure ToJSON(value: T; stream: TDJJsonStream); virtual; abstract;
+    function FromJSON(stream: TDJJsonStream): T; virtual; abstract;
   end;
 
   /// <summary>
@@ -164,5 +170,92 @@ type
   end;
 
 implementation
+
+type
+  TTestRecord = record
+    abc: integer;
+  end;
+
+  { DJValueAttribute }
+
+constructor DJValueAttribute.Create(const Name: string);
+begin
+  self.Name := name;
+end;
+
+{ DJDefaultValueAttribute }
+
+constructor DJDefaultValueAttribute.Create(const value: single);
+begin
+  self.value := Variant(value);
+end;
+
+constructor DJDefaultValueAttribute.Create(const value: integer);
+begin
+  self.value := Variant(value);
+end;
+
+constructor DJDefaultValueAttribute.Create(const value: string);
+begin
+  self.value := Variant(value);
+end;
+
+constructor DJDefaultValueAttribute.Create(const value: Variant);
+begin
+  self.value := value;
+end;
+
+constructor DJDefaultValueAttribute.Create(const value: Boolean);
+begin
+  self.value := Variant(value);
+end;
+
+constructor DJDefaultValueAttribute.Create(const value: double);
+begin
+  self.value := Variant(value);
+end;
+
+function DJDefaultValueAttribute.GetValue: Variant;
+begin
+  Result := self.value;
+end;
+
+function DJDefaultValueAttribute.IsVariant: Boolean;
+begin
+  Result := true;
+end;
+
+{ DJNoUnusedJSONFieldsAttribute }
+
+constructor DJNoUnusedJSONFieldsAttribute.Create(const noUnusedFields: Boolean);
+begin
+  self.noUnusedFields := noUnusedFields;
+end;
+
+{ DJRequiredAttribute }
+
+constructor DJRequiredAttribute.Create(const required: Boolean);
+begin
+  self.required := required;
+end;
+
+{ DJDefaultValueCreatorAttribute<T> }
+
+function DJDefaultValueCreatorAttribute<T>.GetValue: T;
+begin
+  Result := self.Generator;
+end;
+
+function DJDefaultValueCreatorAttribute<T>.IsVariant: Boolean;
+begin
+  Result := False;
+end;
+
+{ DJConverterAttribute<T> }
+
+function DJConverterAttribute<T>.Dummy: Boolean;
+begin
+  Result := true;
+end;
 
 end.

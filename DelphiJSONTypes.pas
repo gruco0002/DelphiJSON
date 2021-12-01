@@ -288,6 +288,8 @@ type
     constructor Create(errorMessage: String; path: TArray<String>);
     destructor Destroy; override;
     function FullPath: string;
+
+    class function PathToString(path: TArray<String>): String;
   end;
 
   /// <summary>
@@ -477,6 +479,55 @@ begin
       self.WriteTJsonValue(tmpValue, tmpPropertyName);
     end;
     self.WriteEndObject;
+  end;
+end;
+
+{ TDJSettings }
+
+constructor TDJSettings.Default;
+begin
+  RequireSerializableAttributeForNonRTLClasses := true;
+  DateTimeReturnUTC := true;
+  IgnoreNonNillable := False;
+  RequiredByDefault := true;
+  TreatStringDictionaryAsObject := true;
+  AllowUnusedJSONFields := true;
+end;
+
+{ EDJError }
+
+constructor EDJError.Create(errorMessage: String; path: TArray<String>);
+begin
+  inherited Create(errorMessage + ' - ' + PathToString(path));
+  self.errorMessage := errorMessage;
+  self.path := path;
+end;
+
+destructor EDJError.Destroy;
+begin
+  inherited;
+end;
+
+function EDJError.FullPath: string;
+begin
+  Result := EDJError.PathToString(self.path);
+end;
+
+class function EDJError.PathToString(path: TArray<String>): String;
+var
+  ele: String;
+begin
+  Result := '';
+  for ele in path do
+  begin
+    if Result.Length = 0 then
+    begin
+      Result := ele;
+    end
+    else
+    begin
+      Result := Result + '>' + ele;
+    end;
   end;
 end;
 
