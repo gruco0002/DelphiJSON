@@ -19,6 +19,9 @@ type
 
   /// <summary>
   /// Static class that has functions for (de)serializing.
+  ///
+  /// This class uses RTTI to (de)serialize!
+  ///
   /// Note: always specify the correct type for [T]. Wrong types could lead to
   /// undefined behaviour.
   /// An instance of this class must not be created.
@@ -100,10 +103,13 @@ type
     RTTI: TRttiContext;
     settings: TDJSettings;
 
+    stream: TDJJSONStream;
+
     constructor Create;
     destructor Destroy; override;
 
     function FullPath: string;
+    function GetPath: TArray<string>;
     procedure PushPath(val: string); overload;
     procedure PushPath(index: integer); overload;
     procedure PopPath;
@@ -121,85 +127,61 @@ type
 
   TDerContext = TSerContext;
 
-function SerializeInternal(value: TValue; context: TSerContext): TJSONValue;
-function DeserializeInternal(value: TJSONValue; dataType: TRttiType;
-  context: TDerContext): TValue;
+procedure SerializeInternal(value: TValue; context: TSerContext);
+function DeserializeInternal(dataType: TRttiType; context: TDerContext): TValue;
 
 implementation
 
 uses
   System.TypInfo, System.DateUtils;
 
-function PathToString(path: TEnumerable<String>): String;
-var
-  ele: String;
-begin
-  Result := '';
-  for ele in path do
-  begin
-    if Result.Length = 0 then
-    begin
-      Result := ele;
-    end
-    else
-    begin
-      Result := Result + '>' + ele;
-    end;
-  end;
-end;
-
-function SerArray(value: TValue; context: TSerContext): TJSONArray;
+procedure SerArray(value: TValue; context: TSerContext);
 var
   size: integer;
   i: integer;
   tmp: TJSONValue;
 begin
-  Result := TJSONArray.Create;
-  context.AddHeapObject(Result);
+  context.stream.WriteBeginArray();
   size := value.GetArrayLength;
   for i := 0 to size - 1 do
   begin
     context.PushPath(i.ToString);
-    tmp := SerializeInternal(value.GetArrayElement(i), context);
-    context.RemoveHeapObject(tmp);
-    Result.AddElement(tmp);
+    SerializeInternal(value.GetArrayElement(i), context);
     context.PopPath;
   end;
+
+  context.stream.WriteEndArray;
 end;
 
-function SerFloat(value: TValue; context: TSerContext): TJSONNumber;
+procedure SerFloat(value: TValue; context: TSerContext);
 begin
-  Result := TJSONNumber.Create(value.AsType<single>());
-  context.AddHeapObject(Result);
+  context.stream.WriteValueFloat(value.AsType<single>());
 end;
 
-function SerInt64(value: TValue; context: TSerContext): TJSONNumber;
+procedure SerInt64(value: TValue; context: TSerContext);
 begin
-  Result := TJSONNumber.Create(value.AsInt64);
-  context.AddHeapObject(Result);
+  context.stream.WriteValueInteger(value.AsInt64);
 end;
 
-function SerInt(value: TValue; context: TSerContext): TJSONNumber;
+procedure SerInt(value: TValue; context: TSerContext);
 begin
-  Result := TJSONNumber.Create(value.AsInteger);
-  context.AddHeapObject(Result);
+  context.stream.WriteValueInteger(value.AsInteger);
 end;
 
-function SerString(value: TValue; context: TSerContext): TJSONString;
+procedure SerString(value: TValue; context: TSerContext);
 begin
-  Result := TJSONString.Create(value.AsString);
-  context.AddHeapObject(Result);
+  context.stream.WriteValueString(value.AsString);
 end;
 
-function SerTEnumerable(data: TObject; dataType: TRttiType;
-  context: TSerContext): TJSONArray;
+procedure SerTEnumerable(data: TObject; dataType: TRttiType;
+  context: TSerContext);
 var
   getEnumerator: TRttiMethod;
   enumerator: TValue;
   moveNext: TRttiMethod;
   currentProperty: TRttiProperty;
   currentValue: TValue;
-  currentSerialized: TJSONValue;
+
   moveNextValue: TValue;
   moveNextResult: Boolean;
   i: integer;
@@ -213,8 +195,7 @@ begin
   moveNext := getEnumerator.ReturnType.GetMethod('MoveNext');
   currentProperty := getEnumerator.ReturnType.GetProperty('Current');
 
-  Result := TJSONArray.Create;
-  context.AddHeapObject(Result);
+  context.stream.WriteBeginArray();
 
   // inital move
   moveNextValue := moveNext.Invoke(enumerator.AsObject, []);
@@ -228,10 +209,8 @@ begin
 
     // serialize it and add it to the result
     context.PushPath(i.ToString);
-    currentSerialized := SerializeInternal(currentValue, context);
+    SerializeInternal(currentValue, context);
     context.PopPath;
-    context.RemoveHeapObject(currentSerialized);
-    Result.AddElement(currentSerialized);
 
     // move to the next object
     moveNextValue := moveNext.Invoke(enumerator.AsObject, []);
@@ -241,10 +220,11 @@ begin
 
   enumerator.AsObject.Free;
 
+  context.stream.WriteEndArray;
 end;
 
-function SerTDictionaryStringKey(data: TObject; dataType: TRttiType;
-  context: TSerContext): TJSONObject;
+procedure SerTDictionaryStringKey(data: TObject; dataType: TRttiType;
+  context: TSerContext);
 var
   getEnumerator: TRttiMethod;
   enumerator: TValue;
@@ -257,7 +237,6 @@ var
   keyValue: TValue;
   valueValue: TValue;
   keyString: string;
-  serializedValue: TJSONValue;
 
   moveNextValue: TValue;
   moveNextResult: Boolean;
@@ -274,8 +253,7 @@ begin
   keyField := currentProperty.PropertyType.GetField('Key');
   valueField := currentProperty.PropertyType.GetField('Value');
 
-  Result := TJSONObject.Create;
-  context.AddHeapObject(Result);
+  context.stream.WriteBeginObject();
 
   // inital move
   moveNextValue := moveNext.Invoke(enumerator.AsObject, []);
@@ -292,10 +270,9 @@ begin
     keyString := keyValue.AsString;
 
     context.PushPath(keyString);
-    serializedValue := SerializeInternal(valueValue, context);
+    context.stream.WriteSetNextPropertyName(keyString);
+    SerializeInternal(valueValue, context);
     context.PopPath;
-    context.RemoveHeapObject(serializedValue);
-    Result.AddPair(keyString, serializedValue);
 
     // move to the next object
     moveNextValue := moveNext.Invoke(enumerator.AsObject, []);
@@ -304,17 +281,17 @@ begin
 
   enumerator.AsObject.Free;
 
+  context.stream.WriteEndObject;
+
 end;
 
-function SerTPair(data: TValue; dataType: TRttiType; context: TSerContext)
-  : TJSONObject;
+procedure SerTPair(data: TValue; dataType: TRttiType; context: TSerContext);
 var
   keyField: TRttiField;
   valueField: TRttiField;
   keyValue: TValue;
   valueValue: TValue;
-  serializedKey: TJSONValue;
-  serializedValue: TJSONValue;
+
 begin
   keyField := dataType.GetField('Key');
   valueField := dataType.GetField('Value');
@@ -322,36 +299,31 @@ begin
   keyValue := keyField.GetValue(data.GetReferenceToRawData);
   valueValue := valueField.GetValue(data.GetReferenceToRawData);
 
+  context.stream.WriteBeginObject();
+
   context.PushPath('key');
-  serializedKey := SerializeInternal(keyValue, context);
+  context.stream.WriteSetNextPropertyName('key');
+  SerializeInternal(keyValue, context);
   context.PopPath;
   context.PushPath('value');
-  serializedValue := SerializeInternal(valueValue, context);
+  context.stream.WriteSetNextPropertyName('value');
+  SerializeInternal(valueValue, context);
   context.PopPath;
 
-  Result := TJSONObject.Create;
-  context.AddHeapObject(Result);
-  context.RemoveHeapObject(serializedKey);
-  Result.AddPair('key', serializedKey);
-  context.RemoveHeapObject(serializedValue);
-  Result.AddPair('value', serializedValue);
-
+  context.stream.WriteEndObject;
 end;
 
-function SerTDateTime(data: TValue; dataType: TRttiType; context: TSerContext)
-  : TJSONString;
+procedure SerTDateTime(data: TValue; dataType: TRttiType; context: TSerContext);
 var
   dt: TDateTime;
   str: string;
 begin
   dt := data.AsType<TDateTime>();
   str := DateToISO8601(dt, context.settings.DateTimeReturnUTC);
-  Result := TJSONString.Create(str);
-  context.AddHeapObject(Result);
+  context.stream.WriteValueString(str);
 end;
 
-function SerTDate(data: TValue; dataType: TRttiType; context: TSerContext)
-  : TJSONString;
+procedure SerTDate(data: TValue; dataType: TRttiType; context: TSerContext);
 const
   format = 'yyyy-mm-dd';
 var
@@ -360,12 +332,10 @@ var
 begin
   dt := data.AsType<TDate>();
   DateTimeToString(str, format, dt);
-  Result := TJSONString.Create(str);
-  context.AddHeapObject(Result);
+  context.stream.WriteValueString(str);
 end;
 
-function SerTTime(data: TValue; dataType: TRttiType; context: TSerContext)
-  : TJSONString;
+procedure SerTTime(data: TValue; dataType: TRttiType; context: TSerContext);
 const
   format = 'hh:nn:ss.z';
 var
@@ -374,22 +344,20 @@ var
 begin
   dt := data.AsType<TTime>();
   DateTimeToString(str, format, dt);
-  Result := TJSONString.Create(str);
-  context.AddHeapObject(Result);
+  context.stream.WriteValueString(str);
 end;
 
-function SerTJSONValue(data: TValue; dataType: TRttiType; context: TSerContext)
-  : TJSONValue;
+procedure SerTJSONValue(data: TValue; dataType: TRttiType;
+  context: TSerContext);
 var
   original: TJSONValue;
 begin
   original := data.AsType<TJSONValue>();
-  Result := original.Clone as TJSONValue;
-  context.AddHeapObject(Result);
+  context.stream.WriteTJsonValue(original);
 end;
 
 function SerHandledSpecialCase(data: TValue; dataType: TRttiType;
-  var output: TJSONValue; context: TSerContext): Boolean;
+  context: TSerContext): Boolean;
 var
   tmp: TRttiType;
 begin
@@ -399,28 +367,28 @@ begin
     if tmp.Name.ToLower = 'tdatetime' then
     begin
       Result := true;
-      output := SerTDateTime(data, dataType, context);
+      SerTDateTime(data, dataType, context);
       exit;
     end;
 
     if tmp.Name.ToLower = 'tdate' then
     begin
       Result := true;
-      output := SerTDate(data, dataType, context);
+      SerTDate(data, dataType, context);
       exit;
     end;
 
     if tmp.Name.ToLower = 'ttime' then
     begin
       Result := true;
-      output := SerTTime(data, dataType, context);
+      SerTTime(data, dataType, context);
       exit;
     end;
 
     if tmp.Name.ToLower = 'tjsonvalue' then
     begin
       Result := true;
-      output := SerTJSONValue(data, dataType, context);
+      SerTJSONValue(data, dataType, context);
       exit;
     end;
 
@@ -429,21 +397,21 @@ begin
       tmp.Name.ToLower.StartsWith('tdictionary<string,', true)) then
     begin
       Result := true;
-      output := SerTDictionaryStringKey(data.AsObject, dataType, context);
+      SerTDictionaryStringKey(data.AsObject, dataType, context);
       exit;
     end;
 
     if tmp.Name.ToLower.StartsWith('tpair<', true) then
     begin
       Result := true;
-      output := SerTPair(data, dataType, context);
+      SerTPair(data, dataType, context);
       exit;
     end;
 
     if tmp.Name.ToLower.StartsWith('tenumerable<', true) then
     begin
       Result := true;
-      output := SerTEnumerable(data.AsObject, dataType, context);
+      SerTEnumerable(data.AsObject, dataType, context);
       exit;
     end;
 
@@ -453,21 +421,23 @@ begin
   Result := False;
 end;
 
-function SerObject(value: TValue; context: TSerContext; isRecord: Boolean)
-  : TJSONValue;
+procedure SerUsingConverter(value: TValue; dataType: TRttiType;
+  converter: IDJConverterInterface; context: TSerContext);
+begin
+  // TODO: implement
+end;
+
+procedure SerObject(value: TValue; context: TSerContext; isRecord: Boolean);
 var
   // data: TObject;
   dataType: TRttiType;
   attribute: TCustomAttribute;
   found: Boolean;
 
-  resultObject: TJSONObject;
-
   objectFields: TArray<TRttiField>;
   field: TRttiField;
   jsonFieldName: string;
   fieldValue: TValue;
-  serializedField: TJSONValue;
 
   nillable: Boolean;
   converter: IDJConverterInterface;
@@ -494,15 +464,13 @@ begin
     if not found then
     begin
       raise EDJError.Create
-        ('Given object type is missing the JSONSerializable attribute. ',
-        context);
+        ('Given object type is missing the JSONSerializable attribute.',
+        context.GetPath);
     end;
   end;
 
   // Init the result object
-  resultObject := TJSONObject.Create;
-  context.AddHeapObject(resultObject);
-  Result := resultObject;
+  context.stream.WriteBeginObject();
 
   // adding fields to the object
   objectFields := dataType.GetFields;
@@ -548,8 +516,8 @@ begin
     // check if the field name is valid
     if string.IsNullOrWhiteSpace(jsonFieldName) then
     begin
-      raise EDJError.Create
-        ('Invalid JSON field name: is null or whitespace. ', context);
+      raise EDJError.Create('Invalid JSON field name: is null or whitespace. ',
+        context.GetPath);
     end;
 
     if isRecord then
@@ -568,41 +536,39 @@ begin
     begin
       if (not nillable) and (fieldValue.AsObject = nil) then
       begin
-        raise EDJNilError.Create
-          ('Field value must not be nil, but was nil. ', context);
+        raise EDJNilError.Create('Field value must not be nil, but was nil. ',
+          context.GetPath);
       end;
     end;
 
     // serialize
+    context.stream.WriteSetNextPropertyName(jsonFieldName);
     if converter <> nil then
     begin
       // use the converter
-      serializedField := converter.ToJSONinternal(fieldValue);
+      SerUsingConverter(fieldValue, field.FieldType, converter, context);
     end
     else
     begin
       if fieldValue.IsObject and (fieldValue.AsObject = nil) then
       begin
         // field is nil and allowed to be nil, hence return a json null
-        serializedField := TJSONNull.Create;
+        context.stream.WriteValueNull();
       end
       else
       begin
         // use the default serialization
-        serializedField := SerializeInternal(fieldValue, context);
+        SerializeInternal(fieldValue, context);
       end;
     end;
     context.PopPath;
-
-    // add the variable to the resulting object
-    context.RemoveHeapObject(serializedField);
-    resultObject.AddPair(jsonFieldName, serializedField);
-
   end;
+
+  context.stream.WriteEndObject;
 
 end;
 
-function SerializeInternal(value: TValue; context: TSerContext): TJSONValue;
+procedure SerializeInternal(value: TValue; context: TSerContext);
 var
   dataType: TRttiType;
 begin
@@ -615,14 +581,14 @@ begin
     // check if the object was already / is in the process of being serialized
     if context.IsTracked(value.AsObject) then
     begin
-      raise EDJCycleError.Create
-        ('A cycle was detected during serialization!', context);
+      raise EDJCycleError.Create('A cycle was detected during serialization!',
+        context.GetPath);
     end;
     context.Track(value.AsObject);
   end;
 
   // checking if a special case handled the type of data
-  if SerHandledSpecialCase(value, dataType, Result, context) then
+  if SerHandledSpecialCase(value, dataType, context) then
   begin
     exit;
   end;
@@ -630,45 +596,44 @@ begin
   // handle other cases
   if value.IsArray then
   begin
-    Result := SerArray(value, context);
+    SerArray(value, context);
   end
   else if value.Kind = TTypeKind.tkFloat then
   begin
-    Result := SerFloat(value, context);
+    SerFloat(value, context);
   end
   else if value.Kind = TTypeKind.tkInt64 then
   begin
-    Result := SerInt64(value, context);
+    SerInt64(value, context);
   end
   else if value.Kind = TTypeKind.tkInteger then
   begin
-    Result := SerInt(value, context);
+    SerInt(value, context);
   end
   else if value.IsType<string>(False) then
   begin
-    Result := SerString(value, context);
+    SerString(value, context);
   end
   else if value.IsEmpty then
   begin
-    Result := TJSONNull.Create;
-    context.AddHeapObject(Result);
+    context.stream.WriteValueNull();
   end
   else if value.IsType<Boolean> then
   begin
-    Result := TJSONBool.Create(value.AsBoolean);
-    context.AddHeapObject(Result);
+    context.stream.WriteValueBoolean(value.AsBoolean);
   end
   else if value.IsObject then
   begin
-    Result := SerObject(value, context, False);
+    SerObject(value, context, False);
   end
   else if value.Kind = TTypeKind.tkRecord then
   begin
-    Result := SerObject(value, context, true);
+    SerObject(value, context, true);
   end
   else
   begin
-    raise EDJError.Create('Type not supported for serialization. ', context);
+    raise EDJError.Create('Type not supported for serialization. ',
+      context.GetPath);
   end;
 end;
 
@@ -809,32 +774,41 @@ begin
 
   if selectedMethod = nil then
   begin
-    raise EDJError.Create
-      ('Did not find a suitable constructor for type. ', context);
+    raise EDJError.Create('Did not find a suitable constructor for type. ',
+      context.GetPath);
   end;
 
   Result := selectedMethod.Invoke(objType.MetaclassType, params);
   context.AddHeapObject(Result.AsObject);
 end;
 
-function DerArray(value: TJSONArray; dataType: TRttiType;
-  context: TDerContext): TValue;
+function DerArray(dataType: TRttiType; context: TDerContext): TValue;
 var
   res: array of TValue;
   valueType: TRttiType;
   i: integer;
   staticType: TRttiArrayType;
 begin
+  context.stream.ReadStepInto;
+
   if dataType.Handle^.Kind = TTypeKind.tkDynArray then
   begin
     // dynamic array
-    SetLength(res, value.Count);
+    SetLength(res, 0);
+    i := 0;
+
     valueType := TRttiDynamicArrayType(dataType).ElementType;
-    for i := 0 to High(res) do
+    while not context.stream.ReadIsDone do
     begin
+      SetLength(res, Length(res) + 1);
+
       context.PushPath(i.ToString);
-      res[i] := DeserializeInternal(value.Items[i], valueType, context);
+      res[High(res)] := DeserializeInternal(valueType, context);
       context.PopPath;
+
+      Inc(i);
+      context.stream.ReadNext;
+
     end;
     Result := TValue.FromArray(dataType.Handle, res);
   end
@@ -842,27 +816,36 @@ begin
   begin
     // static array
     staticType := TRttiArrayType(dataType);
-    if staticType.TotalElementCount <> value.Count then
+
+    SetLength(res, 0);
+    i := 0;
+
+    valueType := staticType.ElementType;
+    while not context.stream.ReadIsDone do
+    begin
+      SetLength(res, Length(res) + 1);
+
+      context.PushPath(i.ToString);
+      res[High(res)] := DeserializeInternal(valueType, context);
+      context.PopPath;
+
+      Inc(i);
+      context.stream.ReadNext;
+    end;
+    Result := TValue.FromArray(staticType.Handle, res);
+
+    if staticType.TotalElementCount <> Length(res) then
     begin
       raise EDJWrongArraySizeError.Create
         ('Element count of the given JSON array does not match the size of a static array. ',
-        context);
+        context.GetPath);
     end;
-
-    SetLength(res, value.Count);
-    valueType := staticType.ElementType;
-    for i := 0 to High(res) do
-    begin
-      context.PushPath(i.ToString);
-      res[i] := DeserializeInternal(value.Items[i], valueType, context);
-      context.PopPath;
-    end;
-    Result := TValue.FromArray(staticType.Handle, res);
   end;
+
+  context.stream.ReadStepOut;
 end;
 
-function DerNumber(value: TJSONNumber; dataType: TRttiType;
-  context: TDerContext): TValue;
+function DerNumber(dataType: TRttiType; context: TDerContext): TValue;
 var
   valFloat: double;
   valInt64: Int64;
@@ -871,60 +854,53 @@ begin
   if dataType.Handle^.Kind = TTypeKind.tkFloat then
   begin
     // floating point number
-    valFloat := value.AsDouble;
+    valFloat := context.stream.ReadValueFloat;
     Result := TValue.From(valFloat);
   end
   else if dataType.Handle^.Kind = TTypeKind.tkInt64 then
   begin
     // integer 64 bit number
-    valInt64 := value.AsInt64;
+    valInt64 := context.stream.ReadValueInteger;
     Result := TValue.From(valInt64);
   end
   else
   begin
     // int number
-    valInt := value.AsInt;
+    valInt := context.stream.ReadValueInteger;
     Result := TValue.From(valInt);
   end;
 end;
 
-function DerBool(value: TJSONBool; dataType: TRttiType;
-  context: TDerContext): TValue;
+function DerBool(dataType: TRttiType; context: TDerContext): TValue;
 begin
-  Result := TValue.From(value.AsBoolean);
+  Result := TValue.From(context.stream.ReadValueBoolean);
 end;
 
-function DerString(value: TJSONString; dataType: TRttiType;
-  context: TDerContext): TValue;
+function DerString(dataType: TRttiType; context: TDerContext): TValue;
 var
   val: string;
 begin
-  val := value.value;
+  val := context.stream.ReadValueString;
   Result := TValue.From(val);
 end;
 
-procedure DerTDictionaryStringKey(value: TJSONValue; dataType: TRttiType;
-  var objOut: TValue; context: TDerContext);
+procedure DerTDictionaryStringKey(dataType: TRttiType; var objOut: TValue;
+  context: TDerContext);
 var
-  jsonObject: TJSONObject;
-
   addMethod: TRttiMethod;
 
-  jPair: TJSONPair;
-
+  propertyName: string;
   valueKey: TValue;
   // typeKey: TRttiType;
   valueValue: TValue;
   typeValue: TRttiType;
-
-  i: integer;
-
 begin
-  if not(value is TJSONObject) then
+  if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstObject
+  then
   begin
-    raise EDJError.Create('Expected a JSON object. ', context);
+    raise EDJError.Create('Expected a JSON object. ', context.GetPath);
   end;
-  jsonObject := value as TJSONObject;
+  context.stream.ReadStepInto;
 
   // create object
   objOut := DerConstructObject(dataType, context);
@@ -936,46 +912,47 @@ begin
   // typeKey := addMethod.GetParameters[0].ParamType; // this should be a string
   typeValue := addMethod.GetParameters[1].ParamType;
 
-  for i := 0 to jsonObject.Count - 1 do
+  while not context.stream.ReadIsDone do
   begin
-    jPair := jsonObject.Pairs[i];
-    valueKey := TValue.From<string>(jPair.JsonString.value);
+    propertyName := context.stream.ReadPropertyName;
+    valueKey := TValue.From<string>(propertyName);
 
     // deserialize value
-    context.PushPath(jPair.JsonString.value);
-    valueValue := DeserializeInternal(jPair.JsonValue, typeValue, context);
+    context.PushPath(propertyName);
+    valueValue := DeserializeInternal(typeValue, context);
     context.PopPath;
 
     // add the deserialized values to the dictionary
     addMethod.Invoke(objOut, [valueKey, valueValue]);
 
+    context.stream.ReadNext;
   end;
+
+  context.stream.ReadStepOut;
 end;
 
-procedure DerTDictionary(value: TJSONValue; dataType: TRttiType;
-  var objOut: TValue; context: TDerContext);
+procedure DerTDictionary(dataType: TRttiType; var objOut: TValue;
+  context: TDerContext);
 var
-  jsonArray: TJSONArray;
-
   addMethod: TRttiMethod;
 
-  jArrValue: TJSONValue;
-  jArrObject: TJSONObject;
-
-  jsonKey: TJSONValue;
-  JsonValue: TJSONValue;
   valueKey: TValue;
   typeKey: TRttiType;
   valueValue: TValue;
   typeValue: TRttiType;
 
+  foundKey: Boolean;
+  foundValue: Boolean;
+  propertyName: string;
   i: integer;
 begin
-  if not(value is TJSONArray) then
+  if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstArray
+  then
   begin
-    raise EDJError.Create('Expected a JSON array. ', context);
+    raise EDJError.Create('Expected a JSON array. ', context.GetPath);
   end;
-  jsonArray := value as TJSONArray;
+
+  context.stream.ReadStepInto;
 
   // construct object
   objOut := DerConstructObject(dataType, context);
@@ -987,47 +964,77 @@ begin
   typeKey := addMethod.GetParameters[0].ParamType;
   typeValue := addMethod.GetParameters[1].ParamType;
 
-  for i := 0 to jsonArray.Count - 1 do
+  i := 0;
+  while context.stream.ReadIsDone do
   begin
     context.PushPath(i);
-    jArrValue := jsonArray.Items[i];
 
     // split up array entry into key and value and check if this went fine
-    if not(jArrValue is TJSONObject) then
+    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstObject
+    then
     begin
-      raise EDJError.Create('Expected a JSON object. ', context);
-    end;
-    jArrObject := jArrValue as TJSONObject;
-
-    jsonKey := jArrObject.GetValue('key');
-    if jsonKey = nil then
-    begin
-      raise EDJError.Create('Expected a field with name "key". ', context);
+      raise EDJError.Create('Expected a JSON object. ', context.GetPath);
     end;
 
-    JsonValue := jArrObject.GetValue('value');
-    if jsonKey = nil then
+    foundKey := False;
+    foundValue := False;
+
+    context.stream.ReadStepInto;
+    while not context.stream.ReadIsDone do
     begin
-      raise EDJError.Create('Expected a field with name "value". ', context);
+      if foundKey and foundValue then
+      begin
+        break;
+      end;
+
+      propertyName := context.stream.ReadPropertyName;
+      if propertyName = 'key' then
+      begin
+        foundKey := true;
+
+        // deserialize key
+        context.PushPath('key');
+        valueKey := DeserializeInternal(typeKey, context);
+        context.PopPath;
+      end
+      else if propertyName = 'value' then
+      begin
+        foundValue := true;
+
+        // deserialize value
+        context.PushPath('value');
+        valueValue := DeserializeInternal(typeValue, context);
+        context.PopPath;
+      end;
+      context.stream.ReadNext;
+    end;
+    context.stream.ReadStepOut;
+
+    if not foundKey then
+    begin
+      raise EDJError.Create('Expected a field with name "key". ',
+        context.GetPath);
     end;
 
-    // deserialize key and value
-    context.PushPath('key');
-    valueKey := DeserializeInternal(jsonKey, typeKey, context);
-    context.PopPath;
-    context.PushPath('value');
-    valueValue := DeserializeInternal(JsonValue, typeValue, context);
-    context.PopPath;
+    if not foundValue then
+    begin
+      raise EDJError.Create('Expected a field with name "value". ',
+        context.GetPath);
+    end;
 
     // add the deserialized values to the dictionary
     addMethod.Invoke(objOut, [valueKey, valueValue]);
 
     context.PopPath;
 
+    Inc(i);
+    context.stream.ReadNext;
   end;
+  context.stream.ReadStepOut;
 
 end;
 
+// TODO: FIX STUFF FROM HERE ON DOWNWARDS
 procedure DerTPair(value: TJSONValue; dataType: TRttiType; var objOut: TValue;
   context: TDerContext);
 var
@@ -1901,6 +1908,25 @@ end;
 function TSerContext.FullPath: string;
 begin
   Result := PathToString(path);
+end;
+
+function TSerContext.GetPath: TArray<string>;
+var
+  tmp: string;
+  i: integer;
+begin
+  SetLength(Result, self.path.Count);
+  i := Low(Result);
+  for tmp in self.path do
+  begin
+    if i > High(Result) then
+    begin
+      raise Exception.Create('Invalid array index!');
+    end;
+    Result[i] := tmp;
+    Inc(i);
+  end;
+
 end;
 
 function TSerContext.IsTracked(obj: TObject): Boolean;
