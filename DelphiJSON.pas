@@ -1034,76 +1034,103 @@ begin
 
 end;
 
-// TODO: FIX STUFF FROM HERE ON DOWNWARDS
-procedure DerTPair(value: TJSONValue; dataType: TRttiType; var objOut: TValue;
+procedure DerTPair(dataType: TRttiType; var objOut: TValue;
   context: TDerContext);
 var
-  jsonObject: TJSONObject;
-  jsonKey: TJSONValue;
-  JsonValue: TJSONValue;
-
   typeKey: TRttiType;
   typeValue: TRttiType;
+
+  foundKey: Boolean;
+  foundValue: Boolean;
+
+  propertyName: string;
 
   valueKey: TValue;
   valueValue: TValue;
 begin
-  if not(value is TJSONObject) then
+  if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstObject
+  then
   begin
-    raise EDJError.Create('Expected a JSON object. ', context);
-  end;
-  jsonObject := value as TJSONObject;
-
-  jsonKey := jsonObject.GetValue('key');
-  if jsonKey = nil then
-  begin
-    raise EDJError.Create('Expected a field with name "key". ', context);
+    raise EDJError.Create('Expected a JSON object. ', context.GetPath);
   end;
 
-  JsonValue := jsonObject.GetValue('value');
-  if jsonKey = nil then
+  context.stream.ReadStepInto;
+
+  foundKey := False;
+  foundValue := False;
+
+  while not context.stream.ReadIsDone do
   begin
-    raise EDJError.Create('Expected a field with name "value". ', context);
+    if foundKey and foundValue then
+    begin
+      break;
+    end;
+
+    propertyName := context.stream.ReadPropertyName;
+    if propertyName = 'key' then
+    begin
+      foundKey := true;
+
+      // deserialize key
+      context.PushPath('key');
+      typeKey := dataType.GetField('Key').FieldType;
+      valueKey := DeserializeInternal(typeKey, context);
+      context.PopPath;
+    end
+    else if propertyName = 'value' then
+    begin
+      foundValue := true;
+
+      // deserialize value
+      typeValue := dataType.GetField('Value').FieldType;
+      context.PushPath('value');
+      valueValue := DeserializeInternal(typeValue, context);
+      context.PopPath;
+    end;
+
+    context.stream.ReadNext;
+  end;
+  context.stream.ReadStepOut;
+
+  if not foundKey then
+  begin
+    raise EDJError.Create('Expected a field with name "key". ',
+      context.GetPath);
+  end;
+
+  if not foundValue then
+  begin
+    raise EDJError.Create('Expected a field with name "value". ',
+      context.GetPath);
   end;
 
   // create pair
   // TODO: check if this is correct. (alternative TValue.Empty.Cast(type) )
   TValue.Make(nil, dataType.Handle, objOut);
 
-  // deserialize values
-  typeKey := dataType.GetField('Key').FieldType;
-  typeValue := dataType.GetField('Value').FieldType;
-
-  context.PushPath('key');
-  valueKey := DeserializeInternal(jsonKey, typeKey, context);
-  context.PopPath;
-  context.PushPath('value');
-  valueValue := DeserializeInternal(JsonValue, typeValue, context);
-  context.PopPath;
-
   // apply the values to the object
   dataType.GetField('Key').SetValue(objOut.AsObject, valueKey);
   dataType.GetField('Value').SetValue(objOut.AsObject, valueValue);
+
+  context.stream.ReadStepOut;
 end;
 
-procedure DerTEnumerable(value: TJSONValue; dataType: TRttiType;
-  var objOut: TValue; context: TDerContext);
+procedure DerTEnumerable(dataType: TRttiType; var objOut: TValue;
+  context: TDerContext);
 var
-  jsonArray: TJSONArray;
-
   addMethod: TRttiMethod;
   ElementType: TRttiType;
 
-  JsonValue: TJSONValue;
   i: integer;
   elementValue: TValue;
-
 begin
-  if not(value is TJSONArray) then
+  if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstArray
+  then
   begin
-    raise EDJError.Create('Expected a JSON array. ', context);
+    raise EDJError.Create('Expected a JSON array. ', context.GetPath);
   end;
-  jsonArray := value as TJSONArray;
+
+  context.stream.ReadStepInto;
 
   // construct object
   objOut := DerConstructObject(dataType, context);
@@ -1120,39 +1147,42 @@ begin
   if addMethod = nil then
   begin
     raise EDJError.Create
-      ('Could not find a method to add items to the object. ', context);
+      ('Could not find a method to add items to the object. ', context.GetPath);
   end;
   ElementType := addMethod.GetParameters[0].ParamType;
 
-  for i := 0 to jsonArray.Count - 1 do
+  i := 0;
+  while not context.stream.ReadIsDone do
   begin
 
-    JsonValue := jsonArray.Items[i];
     context.PushPath(i.ToString);
-    elementValue := DeserializeInternal(JsonValue, ElementType, context);
+    elementValue := DeserializeInternal(ElementType, context);
     context.PopPath;
 
     // add the element value to the object
     addMethod.Invoke(objOut, [elementValue]);
+
+    context.stream.ReadNext;
+    Inc(i);
   end;
 
+  context.stream.ReadStepOut;
 end;
 
-procedure DerTDateTime(value: TJSONValue; dataType: TRttiType;
-  var objOut: TValue; context: TDerContext);
+procedure DerTDateTime(dataType: TRttiType; var objOut: TValue;
+  context: TDerContext);
 var
-  jStr: TJSONString;
   str: string;
   dt: TDateTime;
 begin
-
-  if not(value is TJSONString) then
+  if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstString
+  then
   begin
     raise EDJError.Create
-      ('Expected a JSON string in date time ISO 8601 format.', context);
+      ('Expected a JSON string in date time ISO 8601 format.', context.GetPath);
   end;
-  jStr := value as TJSONString;
-  str := jStr.value;
+
+  str := context.stream.ReadValueString;
   try
     dt := ISO8601ToDate(str, context.settings.DateTimeReturnUTC);
   except
@@ -1160,30 +1190,30 @@ begin
     begin
       raise EDJFormatError.Create
         ('Invalid DateTime format was provided. Expected an ISO 8601 ' +
-        'formatted string.', context);
+        'formatted string.', context.GetPath);
     end;
   end;
 
   objOut := TValue.From(dt);
 end;
 
-procedure DerTDate(value: TJSONValue; dataType: TRttiType; var objOut: TValue;
+procedure DerTDate(dataType: TRttiType; var objOut: TValue;
   context: TDerContext);
 const
   format = 'yyyy-mm-dd';
 var
-  jStr: TJSONString;
   str: string;
   dt: TDate;
   fmt: TFormatSettings;
 begin
-
-  if not(value is TJSONString) then
+  if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstString
+  then
   begin
-    raise EDJError.Create('Expected a JSON string in date format.', context);
+    raise EDJError.Create('Expected a JSON string in date format.',
+      context.GetPath);
   end;
-  jStr := value as TJSONString;
-  str := jStr.value;
+
+  str := context.stream.ReadValueString;
   try
     fmt := TFormatSettings.Create('en-US');
     fmt.LongDateFormat := format;
@@ -1195,30 +1225,30 @@ begin
     begin
       raise EDJFormatError.Create
         ('Invalid Date format was provided. Expected an "' + format +
-        '" formatted string.', context);
+        '" formatted string.', context.GetPath);
     end;
   end;
 
   objOut := TValue.From(dt);
 end;
 
-procedure DerTTime(value: TJSONValue; dataType: TRttiType; var objOut: TValue;
+procedure DerTTime(dataType: TRttiType; var objOut: TValue;
   context: TDerContext);
 const
   format = 'hh:nn:ss.z';
 var
-  jStr: TJSONString;
   str: string;
   dt: TTime;
   fmt: TFormatSettings;
 begin
-
-  if not(value is TJSONString) then
+  if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstString
+  then
   begin
-    raise EDJError.Create('Expected a JSON string in time format.', context);
+    raise EDJError.Create('Expected a JSON string in time format.',
+      context.GetPath);
   end;
-  jStr := value as TJSONString;
-  str := jStr.value;
+
+  str := context.stream.ReadValueString;
   try
     fmt := TFormatSettings.Create('en-US');
     fmt.LongTimeFormat := format;
@@ -1230,25 +1260,25 @@ begin
     begin
       raise EDJFormatError.Create
         ('Invalid DateTime format was provided. Expected an "' + format +
-        '" formatted string.', context);
+        '" formatted string.', context.GetPath);
     end;
   end;
 
   objOut := TValue.From(dt);
 end;
 
-procedure DerTJSONValue(value: TJSONValue; dataType: TRttiType;
-  var objOut: TValue; context: TDerContext);
+procedure DerTJSONValue(dataType: TRttiType; var objOut: TValue;
+  context: TDerContext);
 var
   output: TJSONValue;
 begin
-  output := value.Clone as TJSONValue;
+  output := context.stream.ReadAsTJsonValue;
   context.AddHeapObject(output);
   objOut := TValue.From(output);
 end;
 
-function DerHandledSpecialCase(value: TJSONValue; dataType: TRttiType;
-  var objOut: TValue; context: TDerContext): Boolean;
+function DerHandledSpecialCase(dataType: TRttiType; var objOut: TValue;
+  context: TDerContext): Boolean;
 var
   tmp: TRttiType;
 begin
@@ -1258,28 +1288,28 @@ begin
     if tmp.Name.ToLower = 'tdatetime' then
     begin
       Result := true;
-      DerTDateTime(value, dataType, objOut, context);
+      DerTDateTime(dataType, objOut, context);
       exit;
     end;
 
     if tmp.Name.ToLower = 'tdate' then
     begin
       Result := true;
-      DerTDate(value, dataType, objOut, context);
+      DerTDate(dataType, objOut, context);
       exit;
     end;
 
     if tmp.Name.ToLower = 'ttime' then
     begin
       Result := true;
-      DerTTime(value, dataType, objOut, context);
+      DerTTime(dataType, objOut, context);
       exit;
     end;
 
     if tmp.Name.ToLower = 'tjsonvalue' then
     begin
       Result := true;
-      DerTJSONValue(value, dataType, objOut, context);
+      DerTJSONValue(dataType, objOut, context);
       exit;
     end;
 
@@ -1288,28 +1318,28 @@ begin
       tmp.Name.ToLower.StartsWith('tdictionary<string,', true)) then
     begin
       Result := true;
-      DerTDictionaryStringKey(value, dataType, objOut, context);
+      DerTDictionaryStringKey(dataType, objOut, context);
       exit;
     end;
 
     if tmp.Name.ToLower.StartsWith('tdictionary<', true) then
     begin
       Result := true;
-      DerTDictionary(value, dataType, objOut, context);
+      DerTDictionary(dataType, objOut, context);
       exit;
     end;
 
     if tmp.Name.ToLower.StartsWith('tpair<', true) then
     begin
       Result := true;
-      DerTPair(value, dataType, objOut, context);
+      DerTPair(dataType, objOut, context);
       exit;
     end;
 
     if tmp.Name.ToLower.StartsWith('tenumerable<', true) then
     begin
       Result := true;
-      DerTEnumerable(value, dataType, objOut, context);
+      DerTEnumerable(dataType, objOut, context);
       exit;
     end;
 
@@ -1319,12 +1349,10 @@ begin
   Result := False;
 end;
 
-function DerObject(value: TJSONValue; dataType: TRttiType; context: TDerContext;
+function DerObject(dataType: TRttiType; context: TDerContext;
   isRecord: Boolean): TValue;
 var
   objValue: TValue;
-
-  jsonObject: TJSONObject;
 
   attribute: TCustomAttribute;
   found: Boolean;
@@ -1332,7 +1360,6 @@ var
   objectFields: TArray<TRttiField>;
   field: TRttiField;
   jsonFieldName: string;
-  JsonValue: TJSONValue;
 
   fieldValue: TValue;
 
@@ -1359,11 +1386,12 @@ begin
   end;
 
   // check if this is a json object
-  if not(value is TJSONObject) then
+  if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstObject
+  then
   begin
-    raise EDJError.Create('Expected a JSON Object. ', context);
+    raise EDJError.Create('Expected a JSON Object. ', context.GetPath);
   end;
-  jsonObject := value as TJSONObject;
+  context.stream.ReadStepInto;
 
   // handle a "standard" object and deserialize it
   allowUnusedFields := context.settings.AllowUnusedJSONFields;
@@ -1388,9 +1416,11 @@ begin
     begin
       raise EDJError.Create
         ('Given object type is missing the JSONSerializable attribute. ',
-        context);
+        context.GetPath);
     end;
   end;
+
+  // TODO: FIX STUFF FROM HERE ON DOWNWARDS
 
   fieldsUsed := 0;
   // getting fields from the object
