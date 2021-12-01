@@ -1,7 +1,7 @@
 ///
 /// DelphiJSON Library - Copyright (c) 2021 Corbinian Gruber
 ///
-/// Version: 1.0.0
+/// Version: 2.0.0
 ///
 /// This library is licensed under the MIT License.
 /// https://github.com/gruco0002/DelphiJSON
