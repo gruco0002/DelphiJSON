@@ -22,11 +22,30 @@ type
   /// LJsonTextReader from the RTL for the (de)serialization process.
   ///
   /// A default implementation for TJSONValue is provided further down.
+  ///
+  /// About the structure:
+  /// A new json stream always starts with no active value (nil).
+  ///
+  /// In case of reading the read-pointer would point to the given json value.
+  /// If the current read pointer points towards an object or array the reader
+  /// can step into it and the active value becomes the respective object or
+  /// array. The read pointer points then to the first property / value of the
+  /// object / array that became active. The read pointer can be nil / invalid
+  /// if an object / array has no properties / elements. The ReadIsDone then
+  /// yields true. It also returns true if all properties or elements are
+  /// "consumed" by the reader. By calling ReadNext the read pointer goes to
+  /// the next property / element.
+  /// The active values are saved in a stack like manner. By calling
+  /// ReadStepOut the active value changes to the previous active value of the
+  /// stack. This also causes the ReadNext behaviour to be executed on the
+  /// previous active value. This means that you can not step back into the
+  /// object or array after you stepped out of it.
+  ///
   /// </summary>
   TDJJsonStream = class
   public type
     TDJJsonStreamTypes = (djstObject, djstArray, djstNull, djstBoolean,
-      djstNumber, djstString);
+      djstNumberInt, djstNumberFloat, djstString);
   public
     // reading
 
@@ -94,26 +113,95 @@ type
 
   public
     // writing
+
+    /// <summary>
+    /// Begins a new object.
+    /// If propertyName is not empty the object will be added
+    /// as field with the name propertyName to the current value. If the
+    /// current value is not an object this will cause an exception.
+    /// </summary>
     procedure WriteBeginObject(const propertyName: string = '');
       virtual; abstract;
+
+    /// <summary>
+    /// Ends the current object. If no object is active this causes an
+    /// exception.
+    /// </summary>
     procedure WriteEndObject; virtual; abstract;
+
+    /// <summary>
+    /// Begins a new array.
+    /// If propertyName is not empty the array will be added
+    /// as field with the name propertyName to the current value. If the
+    /// current value is not an object this will cause an exception.
+    /// </summary>
     procedure WriteBeginArray(const propertyName: string = '');
       virtual; abstract;
+
+    /// <summary>
+    /// Ends the current array. If no array is active this causes an exception.
+    /// </summary>
     procedure WriteEndArray; virtual; abstract;
+
+    /// <summary>
+    /// Writes the value nil.
+    /// If propertyName is not empty the nil-value will be added
+    /// as field with the name propertyName to the current value. If the
+    /// current value is not an object this will cause an exception.
+    /// </summary>
     procedure WriteValueNull(const propertyName: string = ''); virtual;
       abstract;
+
+    /// <summary>
+    /// Writes a boolean value.
+    /// If propertyName is not empty the boolean will be added
+    /// as field with the name propertyName to the current value. If the
+    /// current value is not an object this will cause an exception.
+    /// </summary>
     procedure WriteValueBoolean(value: Boolean;
       const propertyName: string = ''); virtual; abstract;
+
+    /// <summary>
+    /// Writes a string value.
+    /// If propertyName is not empty the string will be added
+    /// as field with the name propertyName to the current value. If the
+    /// current value is not an object this will cause an exception.
+    /// </summary>
     procedure WriteValueString(const value: string;
       const propertyName: string = ''); virtual; abstract;
+
+    /// <summary>
+    /// Writes an integer value.
+    /// If propertyName is not empty the integer will be added
+    /// as field with the name propertyName to the current value. If the
+    /// current value is not an object this will cause an exception.
+    /// </summary>
     procedure WriteValueInteger(const value: Int64;
       const propertyName: string = ''); virtual; abstract;
+
+    /// <summary>
+    /// Writes a float value.
+    /// If propertyName is not empty the float will be added
+    /// as field with the name propertyName to the current value. If the
+    /// current value is not an object this will cause an exception.
+    /// </summary>
     procedure WriteValueFloat(const value: double;
       const propertyName: string = ''); virtual; abstract;
 
   public
     // helpers for standard conversion from/into TJSONValue
+
+    /// <summary>
+    /// Reads the current active value as TJSONValue and returns it.
+    /// </summary>
     function ReadAsTJsonValue: TJSONValue;
+
+    /// <summary>
+    /// Writes the json value.
+    /// If propertyName is not empty the json value will be added
+    /// as field with the name propertyName to the current value. If the
+    /// current value is not an object this will cause an exception.
+    /// </summary>
     procedure WriteTJsonValue(value: TJSONValue;
       const propertyName: string = '');
   end;
@@ -193,11 +281,11 @@ type
   /// <summary>
   /// Describes an error that happened during deserialization.
   /// </summary>
-  EDJError = class(Exception)
+  EDJError = class(exception)
   public
     path: TArray<String>;
     errorMessage: String;
-    constructor Create(errorMessage: String; const path: TArray<String>);
+    constructor Create(errorMessage: String; path: TArray<String>);
     destructor Destroy; override;
     function FullPath: string;
   end;
@@ -207,7 +295,6 @@ type
   /// </summary>
   EDJRequiredError = class(EDJError)
   public
-
   end;
 
   /// <summary>
@@ -216,7 +303,6 @@ type
   /// </summary>
   EDJNilError = class(EDJError)
   public
-
   end;
 
   /// <summary>
@@ -226,7 +312,6 @@ type
   /// </summary>
   EDJWrongArraySizeError = class(EDJError)
   public
-
   end;
 
   /// <summary>
@@ -238,7 +323,6 @@ type
   /// </summary>
   EDJCycleError = class(EDJError)
   public
-
   end;
 
   /// <summary>
@@ -249,7 +333,6 @@ type
   /// </summary>
   EDJUnusedFieldsError = class(EDJError)
   public
-
   end;
 
   /// <summary>
@@ -260,9 +343,141 @@ type
   /// </summary>
   EDJFormatError = class(EDJError)
   public
-
   end;
 
 implementation
+
+{ TDJJsonStream }
+
+function TDJJsonStream.ReadAsTJsonValue: TJSONValue;
+var
+  t: TDJJsonStreamTypes;
+
+  tmpObject: TJSONObject;
+  tmpArray: TJSONArray;
+
+  tmpPropertyName: string;
+  tmpValue: TJSONValue;
+begin
+  try
+    t := self.ReadGetType;
+
+    case t of
+      djstObject:
+        begin
+          tmpObject := TJSONObject.Create;
+          Result := tmpObject;
+
+          self.ReadStepInto;
+          while not self.ReadIsDone do
+          begin
+            tmpPropertyName := self.ReadPropertyName;
+            tmpValue := self.ReadAsTJsonValue;
+            tmpObject.AddPair(tmpPropertyName, tmpValue);
+            self.ReadNext;
+          end;
+          self.ReadStepOut;
+
+        end;
+      djstArray:
+        begin
+          tmpArray := TJSONArray.Create;
+          Result := tmpArray;
+
+          self.ReadStepInto;
+          while not self.ReadIsDone do
+          begin
+            tmpValue := self.ReadAsTJsonValue;
+            tmpArray.AddElement(tmpValue);
+            self.ReadNext;
+          end;
+          self.ReadStepOut;
+        end;
+      djstNull:
+        begin
+          Result := TJSONNull.Create;
+        end;
+      djstBoolean:
+        begin
+          Result := TJSONBool.Create(self.ReadValueBoolean)
+        end;
+      djstNumberInt:
+        begin
+          Result := TJSONNumber.Create(self.ReadValueInteger);
+        end;
+      djstNumberFloat:
+        begin
+          Result := TJSONNumber.Create(self.ReadValueFloat);
+        end;
+      djstString:
+        begin
+          Result := TJSONString.Create(self.ReadValueString);
+        end;
+    end;
+  except
+    FreeAndNil(Result);
+    raise;
+  end;
+
+end;
+
+procedure TDJJsonStream.WriteTJsonValue(value: TJSONValue;
+  const propertyName: string);
+var
+  tmpArray: TJSONArray;
+  tmpObject: TJSONObject;
+
+  tmpValue: TJSONValue;
+  tmpPropertyName: string;
+  tmpPair: TJSONPair;
+begin
+  if value is TJSONNull then
+  begin
+    self.WriteValueNull(propertyName);
+  end
+  else if value is TJSONBool then
+  begin
+    self.WriteValueBoolean((value as TJSONBool).AsBoolean, propertyName);
+  end
+  else if value is TJSONNumber then
+  begin
+    if value.ToJSON.Contains('.') then
+    begin
+      // float
+      self.WriteValueFloat((value as TJSONNumber).AsDouble, propertyName);
+    end
+    else
+    begin
+      // integer
+      self.WriteValueInteger((value as TJSONNumber).AsInt64, propertyName);
+    end;
+  end
+  else if value is TJSONString then
+  begin
+    self.WriteValueString((value as TJSONString).value);
+  end
+  else if value is TJSONArray then
+  begin
+    tmpArray := value as TJSONArray;
+    self.WriteBeginArray(propertyName);
+    for tmpValue in tmpArray do
+    begin
+      self.WriteTJsonValue(tmpValue);
+    end;
+    self.WriteEndArray;
+  end
+  else if value is TJSONObject then
+  begin
+    tmpObject := value as TJSONObject;
+    self.WriteBeginObject(propertyName);
+    for tmpPair in tmpObject do
+    begin
+      tmpValue := tmpPair.JsonValue;
+      tmpPropertyName := tmpPair.JsonString.value;
+      self.WriteTJsonValue(tmpValue, tmpPropertyName);
+    end;
+    self.WriteEndObject;
+  end;
+end;
 
 end.
