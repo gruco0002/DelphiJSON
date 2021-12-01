@@ -115,6 +115,16 @@ type
     // writing
 
     /// <summary>
+    /// Sets the property name for the next value. The property name specified
+    /// here will be used only if no (empty) property name is given in the
+    /// WriteValue... or WriteBegin... call. Otherwise it will be discarded.
+    ///
+    /// If the current value is not an object this will cause an exception.
+    /// </summary>
+    procedure WriteSetNextPropertyName(const propertyName: string);
+      virtual; abstract;
+
+    /// <summary>
     /// Begins a new object.
     /// If propertyName is not empty the object will be added
     /// as field with the name propertyName to the current value. If the
