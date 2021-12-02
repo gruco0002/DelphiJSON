@@ -1397,8 +1397,77 @@ end;
 
 function DerGetDefaultValue(dataType: TRttiType; context: TDerContext;
   attr: IDJDefaultValue): TValue;
+var
+  attrType: TRttiType;
+  methods: TArray<TRttiMethod>;
+  method: TRttiMethod;
+
+  variantType: TRttiType;
+  variantResult: TValue;
+  variantValue: Variant;
 begin
-  // TODO: implement
+  // function IsVariant: Boolean; virtual; abstract;
+  // function GetValue: Variant;
+  // function GetValue: T
+
+  attrType := context.RTTI.GetType(attr.ClassType);
+
+  // retrieve the get value method
+  methods := attrType.GetMethods('GetValue');
+  if Length(methods) = 0 then
+  begin
+    raise EDJError.Create
+      ('Could not find function "GetValue" on default value attribute!',
+      context.GetPath);
+  end;
+  method := methods[Low(methods)];
+
+  // check if method does not need any parameters
+  if Length(method.GetParameters) > 0 then
+  begin
+    raise EDJError.Create
+      ('Function "GetValue" takes more than zero parameters on default value attribute!',
+      context.GetPath);
+  end;
+
+  if attr.IsVariant then
+  begin
+    // verify that the return type is a variant
+    variantType := context.RTTI.GetType(System.TypeInfo(Variant));
+    if method.ReturnType <> variantType then
+    begin
+      raise EDJError.Create
+        ('Function "GetValue" did not return a variant although it was promised by function "IsVariant" on default value attribute!',
+        context.GetPath);
+    end;
+
+    // get the variant result
+    variantResult := method.Invoke(attr, []);
+    variantValue := variantResult.AsType<Variant>;
+    Result := TValue.FromVariant(variantValue);
+
+    // check its type integrity
+    variantType := context.RTTI.GetType(Result.TypeInfo);
+    if variantType <> dataType then
+    begin
+      raise EDJError.Create
+        ('Data type of variant does not match the annotated fields type on default value attribute!',
+        context.GetPath);
+    end;
+  end
+  else
+  begin
+    // check the result type
+    if method.ReturnType <> dataType then
+    begin
+      raise EDJError.Create
+        ('Result type of "GetValue" does not match the annotated fields type on default value attribute!',
+        context.GetPath);
+    end;
+
+    // get the default value
+    Result := method.Invoke(attr, []);
+  end;
 end;
 
 function DerUsingConverter(dataType: TRttiType; context: TDerContext;

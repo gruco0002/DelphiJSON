@@ -57,7 +57,7 @@ type
   /// that returns the respective default value.
   /// </summary>
   IDJDefaultValue = class(TCustomAttribute)
-  protected
+  public
     function IsVariant: Boolean; virtual; abstract;
   end;
 
@@ -70,7 +70,7 @@ type
   DJDefaultValueAttribute = class(IDJDefaultValue)
   private
     value: Variant;
-  protected
+  public
     function IsVariant: Boolean; override;
   public
     function GetValue: Variant;
@@ -94,7 +94,7 @@ type
   /// This attribute has no effect if not used together with either the [DJDefaultOnNilAttribute] or the [DJRequiredAttribute].
   /// </summary>
   DJDefaultValueCreatorAttribute<T> = class(IDJDefaultValue)
-  protected
+  public
     function IsVariant: Boolean; override;
   public
     function GetValue: T;
