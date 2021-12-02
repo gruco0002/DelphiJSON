@@ -108,7 +108,6 @@ type
     constructor Create;
     destructor Destroy; override;
 
-    function FullPath: string;
     function GetPath: TArray<string>;
     procedure PushPath(val: string); overload;
     procedure PushPath(index: integer); overload;
@@ -120,8 +119,6 @@ type
 
     procedure Track(obj: TObject);
     function IsTracked(obj: TObject): Boolean;
-
-    function ToString: string; override;
 
   end;
 
@@ -139,7 +136,6 @@ procedure SerArray(value: TValue; context: TSerContext);
 var
   size: integer;
   i: integer;
-  tmp: TJSONValue;
 begin
   context.stream.WriteBeginArray();
   size := value.GetArrayLength;
@@ -1349,8 +1345,30 @@ begin
   Result := False;
 end;
 
+function DerGetDefaultValue(dataType: TRttiType; context: TDerContext;
+  attr: IDJDefaultValue): TValue;
+begin
+  // TODO: implement
+end;
+
+function DerUsingConverter(dataType: TRttiType; context: TDerContext;
+  attr: IDJConverterInterface): TValue;
+begin
+  // TODO: implement
+end;
+
 function DerObject(dataType: TRttiType; context: TDerContext;
   isRecord: Boolean): TValue;
+type
+  TFieldData = record
+    field: TRttiField;
+    jsonFieldName: string;
+    nillable: Boolean;
+    required: Boolean;
+    defaultValue: IDJDefaultValue;
+    nilIsDefault: Boolean;
+    converter: IDJConverterInterface;
+  end;
 var
   objValue: TValue;
 
@@ -1358,158 +1376,269 @@ var
   found: Boolean;
 
   objectFields: TArray<TRttiField>;
-  field: TRttiField;
-  jsonFieldName: string;
+  rttifield: TRttiField;
+  propertyName: string;
 
   fieldValue: TValue;
 
-  nillable: Boolean;
-  required: Boolean;
-  defaultValue: IDJDefaultValue;
-  nilIsDefault: Boolean;
-  converter: IDJConverterInterface;
-
   allowUnusedFields: Boolean;
 
-  fieldsUsed: integer;
+  propertiesUsed: integer;
+  propertiesCount: integer;
+
+  fieldData: TFieldData;
+  fieldDictionary: TDictionary<string, TFieldData>;
 begin
+  fieldDictionary := nil;
+  try
+    fieldDictionary := TDictionary<string, TFieldData>.Create;
 
-  if isRecord then
-  begin
-    // create a record value
-    TValue.Make(nil, dataType.Handle, objValue);
-  end
-  else
-  begin
-    // create a new instance of the object
-    objValue := DerConstructObject(dataType, context);
-  end;
-
-  // check if this is a json object
-  if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstObject
-  then
-  begin
-    raise EDJError.Create('Expected a JSON Object. ', context.GetPath);
-  end;
-  context.stream.ReadStepInto;
-
-  // handle a "standard" object and deserialize it
-  allowUnusedFields := context.settings.AllowUnusedJSONFields;
-  found := False;
-  for attribute in dataType.GetAttributes() do
-  begin
-    if attribute is DJSerializableAttribute then
+    if isRecord then
     begin
-      found := true;
-    end
-    else if attribute is DJNoUnusedJSONFieldsAttribute then
-    begin
-      allowUnusedFields := not(attribute as DJNoUnusedJSONFieldsAttribute)
-        .noUnusedFields;
-    end;
-  end;
-
-  if context.settings.RequireSerializableAttributeForNonRTLClasses then
-  begin
-    // Ensure the object has the serializable attribute.
-    if not found then
-    begin
-      raise EDJError.Create
-        ('Given object type is missing the JSONSerializable attribute. ',
-        context.GetPath);
-    end;
-  end;
-
-  // TODO: FIX STUFF FROM HERE ON DOWNWARDS
-
-  fieldsUsed := 0;
-  // getting fields from the object
-  objectFields := dataType.GetFields;
-  for field in objectFields do
-  begin
-    // define the standard properties for a field
-    found := False;
-    nillable := true;
-    required := context.settings.RequiredByDefault;
-    defaultValue := nil;
-    nilIsDefault := False;
-    converter := nil;
-
-    // check for the attributes and update the properties
-    for attribute in field.GetAttributes() do
-    begin
-      if attribute is DJValueAttribute then
-      begin
-        // found the value attribute (this needs to be serialized)
-        found := true;
-        jsonFieldName := (attribute as DJValueAttribute).Name.Trim;
-      end
-      else if attribute is DJNonNilableAttribute then
-      begin
-        // nil is not allowed
-        nillable := False;
-      end
-      else if attribute is DJRequiredAttribute then
-      begin
-        required := (attribute as DJRequiredAttribute).required;
-      end
-      else if attribute is IDJDefaultValue then
-      begin
-        defaultValue := attribute as IDJDefaultValue;
-      end
-      else if attribute is DJDefaultOnNilAttribute then
-      begin
-        nilIsDefault := true;
-      end
-      else if attribute is IDJConverterInterface then
-      begin
-        converter := attribute as IDJConverterInterface;
-      end;
-    end;
-
-    // check if nillable is allowed
-    if context.settings.IgnoreNonNillable then
-    begin
-      nillable := true;
-    end;
-
-    if not found then
-    begin
-      // skip this field since it is not opted-in for serialization
-      continue;
-    end;
-
-    // check if the field name is valid
-    if string.IsNullOrWhiteSpace(jsonFieldName) then
-    begin
-      raise EDJError.Create
-        ('Invalid JSON field name: is null or whitespace. ', context);
-    end;
-
-    // check if the field name exists in the json structure
-
-    JsonValue := jsonObject.GetValue(jsonFieldName);
-    if required then
-    begin
-      // the field is required but was not found
-      if JsonValue = nil then
-      begin
-        raise EDJRequiredError.Create('Value with name "' + jsonFieldName +
-          '" missing in JSON data. ', context);
-      end;
+      // create a record value
+      TValue.Make(nil, dataType.Handle, objValue);
     end
     else
     begin
-      // the field is not required, check if it was found
-      if JsonValue = nil then
-      begin
-        // the field was not found, use the default value (if existing) and continue with the next field
+      // create a new instance of the object
+      objValue := DerConstructObject(dataType, context);
+    end;
 
-        if defaultValue <> nil then
+    // check if this is a json object
+    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstObject
+    then
+    begin
+      raise EDJError.Create('Expected a JSON Object. ', context.GetPath);
+    end;
+    context.stream.ReadStepInto;
+
+    // handle a "standard" object and deserialize it
+    allowUnusedFields := context.settings.AllowUnusedJSONFields;
+    found := False;
+    for attribute in dataType.GetAttributes() do
+    begin
+      if attribute is DJSerializableAttribute then
+      begin
+        found := true;
+      end
+      else if attribute is DJNoUnusedJSONFieldsAttribute then
+      begin
+        allowUnusedFields := not(attribute as DJNoUnusedJSONFieldsAttribute)
+          .noUnusedFields;
+      end;
+    end;
+
+    if context.settings.RequireSerializableAttributeForNonRTLClasses then
+    begin
+      // Ensure the object has the serializable attribute.
+      if not found then
+      begin
+        raise EDJError.Create
+          ('Given object type is missing the JSONSerializable attribute. ',
+          context.GetPath);
+      end;
+    end;
+
+    // TODO: FIX STUFF FROM HERE ON DOWNWARDS
+    objectFields := dataType.GetFields;
+    for rttifield in objectFields do
+    begin
+      // define the standard properties for a field
+      found := False;
+      fieldData.jsonFieldName := '';
+      fieldData.nillable := true;
+      fieldData.required := context.settings.RequiredByDefault;
+      fieldData.defaultValue := nil;
+      fieldData.nilIsDefault := False;
+      fieldData.converter := nil;
+
+      fieldData.field := rttifield;
+
+      for attribute in rttifield.GetAttributes() do
+      begin
+        if attribute is DJValueAttribute then
+        begin
+          // found the value attribute (this needs to be serialized)
+          found := true;
+          fieldData.jsonFieldName := (attribute as DJValueAttribute).Name.Trim;
+        end
+        else if attribute is DJNonNilableAttribute then
+        begin
+          // nil is not allowed
+          fieldData.nillable := False;
+        end
+        else if attribute is DJRequiredAttribute then
+        begin
+          fieldData.required := (attribute as DJRequiredAttribute).required;
+        end
+        else if attribute is IDJDefaultValue then
+        begin
+          fieldData.defaultValue := attribute as IDJDefaultValue;
+        end
+        else if attribute is DJDefaultOnNilAttribute then
+        begin
+          fieldData.nilIsDefault := true;
+        end
+        else if attribute is IDJConverterInterface then
+        begin
+          fieldData.converter := attribute as IDJConverterInterface;
+        end;;
+      end;
+
+      // check if nillable is allowed
+      if context.settings.IgnoreNonNillable then
+      begin
+        fieldData.nillable := true;
+      end;
+
+      if found then
+      begin
+        // check if the field name is valid
+        if string.IsNullOrWhiteSpace(fieldData.jsonFieldName) then
+        begin
+          raise EDJError.Create
+            ('Invalid JSON field name: is null or whitespace. ',
+            context.GetPath);
+        end;
+
+        // check if field name was used twice
+        if fieldDictionary.ContainsKey(fieldData.jsonFieldName) then
+        begin
+          raise EDJError.Create('JSON Field name "' + fieldData.jsonFieldName +
+            '" was assigned to two variables!', context.GetPath);
+        end;
+
+        // add field to dictionary
+        fieldDictionary.Add(fieldData.jsonFieldName, fieldData);
+      end;
+    end;
+
+    // read the json values of the object
+    propertiesUsed := 0;
+    propertiesCount := 0;
+    while not context.stream.ReadIsDone do
+    begin
+      Inc(propertiesCount);
+
+      propertyName := context.stream.ReadPropertyName;
+      if not fieldDictionary.TryGetValue(propertyName, fieldData) then
+      begin
+        context.stream.ReadNext;
+        continue;
+      end;
+
+      // use the json value provided
+      Inc(propertiesUsed);
+
+      // remove it from the dictionary
+      fieldDictionary.Remove(propertyName);
+
+      // check if null is a valid json value
+      if context.stream.ReadGetType = TDJJSONStream.TDJJsonStreamTypes.djstNull
+      then
+      begin
+        if not fieldData.nillable then
+        begin
+          context.PushPath(propertyName);
+          raise EDJNilError.Create
+            ('Field value must not be nil, but JSON was null for field with name "'
+            + propertyName + '". ', context.GetPath);
+        end
+        else if fieldData.nilIsDefault then
+        begin
+          if fieldData.defaultValue <> nil then
+          begin
+            // a default value is defined, use it
+            context.PushPath(propertyName);
+            fieldValue := DerGetDefaultValue(fieldData.field.FieldType, context,
+              fieldData.defaultValue);
+            if fieldValue.IsObject then
+            begin
+              context.AddHeapObject(fieldValue.AsObject);
+            end;
+            context.PopPath;
+
+            // set the value in the resulting object
+            if isRecord then
+            begin
+              fieldData.field.SetValue(objValue.GetReferenceToRawData,
+                fieldValue);
+            end
+            else
+            begin
+              fieldData.field.SetValue(objValue.AsObject, fieldValue);
+            end;
+
+            context.stream.ReadNext;
+            continue;
+          end
+          else
+          begin
+            raise EDJError.Create
+              ('Field should use a default value if JSON was null, but no default value attribute was defined for field with name "'
+              + propertyName + '". ', context.GetPath);
+          end;
+        end;
+      end;
+
+      // check for converters
+      context.PushPath(propertyName);
+      if fieldData.converter <> nil then
+      begin
+        // converter deserialization
+        fieldValue := DerUsingConverter(fieldData.field.FieldType, context,
+          fieldData.converter);
+      end
+      else
+      begin
+        if context.stream.ReadGetType = TDJJSONStream.TDJJsonStreamTypes.djstNull
+        then
+        begin
+          // field is allowed to be null and is null, hence set it to the empty value
+          fieldValue := TValue.Empty;
+        end
+        else
+        begin
+          // default deserialization
+          fieldValue := DeserializeInternal(fieldData.field.FieldType, context);
+        end;
+      end;
+      context.PopPath;
+
+      // set the value in the resulting object
+      if isRecord then
+      begin
+        fieldData.field.SetValue(objValue.GetReferenceToRawData, fieldValue);
+      end
+      else
+      begin
+        fieldData.field.SetValue(objValue.AsObject, fieldValue);
+      end;
+
+      context.stream.ReadNext;
+    end;
+
+    // check for all unused fields and set their default values or raise an error
+    // if required
+    for fieldData in fieldDictionary.Values do
+    begin
+      if fieldData.required then
+      begin
+        // the field is required but was not found
+        raise EDJRequiredError.Create('Value with name "' +
+          fieldData.jsonFieldName + '" missing in JSON data. ',
+          context.GetPath);
+      end
+      else
+      begin
+        // the field is not required and the field was not found, use the
+        // default value(if existing) and continue with the next field
+        if fieldData.defaultValue <> nil then
         begin
           // a default value is defined, use it
-          context.PushPath(jsonFieldName);
-          fieldValue := defaultValue.GetValue;
+          context.PushPath(fieldData.jsonFieldName);
+          fieldValue := DerGetDefaultValue(fieldData.field.FieldType, context,
+            fieldData.defaultValue);
           if fieldValue.IsObject then
           begin
             context.AddHeapObject(fieldValue.AsObject);
@@ -1519,241 +1648,177 @@ begin
           // set the default value in the resulting object
           if isRecord then
           begin
-            field.SetValue(objValue.GetReferenceToRawData, fieldValue);
+            fieldData.field.SetValue(objValue.GetReferenceToRawData,
+              fieldValue);
           end
           else
           begin
-            field.SetValue(objValue.AsObject, fieldValue);
+            fieldData.field.SetValue(objValue.AsObject, fieldValue);
           end;
 
         end;
 
-        // we took care of this object (either by assigning a default value or by leaving it as it is)
-        continue;
+        // at this point we took care of this object (either by assigning a
+        // default value or by leaving it as it is)
       end;
     end;
 
-    // use the json value provided
-    Inc(fieldsUsed);
-
-    // check if null is a valid json value
-    if JsonValue is TJSONNull then
+    // check if there were unused fields and if that is not allowed
+    if not allowUnusedFields then
     begin
-      if not nillable then
+      if propertiesCount > propertiesUsed then
       begin
-        context.PushPath(jsonFieldName);
-        raise EDJNilError.Create
-          ('Field value must not be nil, but JSON was null for field with name "'
-          + jsonFieldName + '". ', context);
-      end
-      else if nilIsDefault then
-      begin
-        if defaultValue <> nil then
-        begin
-          // a default value is defined, use it
-          context.PushPath(jsonFieldName);
-          fieldValue := defaultValue.GetValue;
-          if fieldValue.IsObject then
-          begin
-            context.AddHeapObject(fieldValue.AsObject);
-          end;
-          context.PopPath;
-
-          // set the value in the resulting object
-          if isRecord then
-          begin
-            field.SetValue(objValue.GetReferenceToRawData, fieldValue);
-          end
-          else
-          begin
-            field.SetValue(objValue.AsObject, fieldValue);
-          end;
-
-          continue;
-
-        end
-        else
-        begin
-          raise EDJError.Create
-            ('Field should use a default value if JSON was null, but no default value attribute was defined for field with name "'
-            + jsonFieldName + '". ', context);
-        end;
+        raise EDJUnusedFieldsError.Create('JSON object contains unused fields.',
+          context.GetPath);
       end;
     end;
 
-    context.PushPath(jsonFieldName);
-    if converter <> nil then
-    begin
-      // converter deserialization
-      fieldValue := converter.FromJSONinternal(JsonValue);
-    end
-    else
-    begin
-      if JsonValue is TJSONNull then
-      begin
-        // field is allowed to be null and is null, hence set it to the empty value
-        fieldValue := TValue.Empty;
-      end
-      else
-      begin
-        // default deserialization
-        fieldValue := DeserializeInternal(JsonValue, field.FieldType, context);
-      end;
-    end;
-    context.PopPath;
-
-    // set the value in the resulting object
-    if isRecord then
-    begin
-      field.SetValue(objValue.GetReferenceToRawData, fieldValue);
-    end
-    else
-    begin
-      field.SetValue(objValue.AsObject, fieldValue);
-    end;
-
+    // return the object
+    Result := objValue;
+  finally
+    fieldDictionary.Free;
   end;
-
-  // check if there were unused fields and if that is not allowed
-  if not allowUnusedFields then
-  begin
-    if jsonObject.Count > fieldsUsed then
-    begin
-      raise EDJUnusedFieldsError.Create
-        ('JSON object contains unused fields.', context);
-    end;
-  end;
-
-  Result := objValue;
-
 end;
 
-function DeserializeInternal(value: TJSONValue; dataType: TRttiType;
-  context: TDerContext): TValue;
+function DeserializeInternal(dataType: TRttiType; context: TDerContext): TValue;
 const
   typeMismatch = 'JSON value type does not match field type. ';
 begin
 
   // handle special cases before
-  if DerHandledSpecialCase(value, dataType, Result, context) then
+  if DerHandledSpecialCase(dataType, Result, context) then
   begin
     exit;
   end;
 
   if dataType.Handle^.Kind = TTypeKind.tkArray then
   begin
-    if not(value is TJSONArray) then
+    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstArray
+    then
     begin
-      raise EDJError.Create(typeMismatch, context);
+      raise EDJError.Create(typeMismatch, context.GetPath);
     end;
-    Result := DerArray(value as TJSONArray, dataType, context);
+    Result := DerArray(dataType, context);
   end
   else if dataType.Handle^.Kind = TTypeKind.tkDynArray then
   begin
-    if not(value is TJSONArray) then
+    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstArray
+    then
     begin
-      raise EDJError.Create(typeMismatch, context);
+      raise EDJError.Create(typeMismatch, context.GetPath);
     end;
-    Result := DerArray(value as TJSONArray, dataType, context);
+    Result := DerArray(dataType, context);
   end
   else if dataType.Handle = System.TypeInfo(Boolean) then
   begin
-    if not(value is TJSONBool) then
+    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstBoolean
+    then
     begin
-      raise EDJError.Create(typeMismatch, context);
+      raise EDJError.Create(typeMismatch, context.GetPath);
     end;
-    Result := DerBool(value as TJSONBool, dataType, context);
+    Result := DerBool(dataType, context);
   end
   else if dataType.Handle^.Kind = TTypeKind.tkInt64 then
   begin
-    if not(value is TJSONNumber) then
+    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstNumberInt
+    then
     begin
-      raise EDJError.Create(typeMismatch, context);
+      raise EDJError.Create(typeMismatch, context.GetPath);
     end;
-    Result := DerNumber(value as TJSONNumber, dataType, context);
+    Result := DerNumber(dataType, context);
   end
   else if dataType.Handle^.Kind = TTypeKind.tkInteger then
   begin
-    if not(value is TJSONNumber) then
+    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstNumberInt
+    then
     begin
-      raise EDJError.Create(typeMismatch, context);
+      raise EDJError.Create(typeMismatch, context.GetPath);
     end;
-    Result := DerNumber(value as TJSONNumber, dataType, context);
+    Result := DerNumber(dataType, context);
   end
   else if dataType.Handle^.Kind = TTypeKind.tkFloat then
   begin
-    if not(value is TJSONNumber) then
+    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstNumberFloat
+    then
     begin
-      raise EDJError.Create(typeMismatch, context);
+      raise EDJError.Create(typeMismatch, context.GetPath);
     end;
-    Result := DerNumber(value as TJSONNumber, dataType, context);
+    Result := DerNumber(dataType, context);
   end
   else if dataType.Handle^.Kind = TTypeKind.tkString then
   begin
-    if not(value is TJSONString) then
+    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstString
+    then
     begin
-      raise EDJError.Create(typeMismatch, context);
+      raise EDJError.Create(typeMismatch, context.GetPath);
     end;
-    Result := DerString(value as TJSONString, dataType, context);
+    Result := DerString(dataType, context);
   end
   else if dataType.Handle^.Kind = TTypeKind.tkWString then
   begin
-    if not(value is TJSONString) then
+    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstString
+    then
     begin
-      raise EDJError.Create(typeMismatch, context);
+      raise EDJError.Create(typeMismatch, context.GetPath);
     end;
-    Result := DerString(value as TJSONString, dataType, context);
+    Result := DerString(dataType, context);
   end
   else if dataType.Handle^.Kind = TTypeKind.tkUString then
   begin
-    if not(value is TJSONString) then
+    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstString
+    then
     begin
-      raise EDJError.Create(typeMismatch, context);
+      raise EDJError.Create(typeMismatch, context.GetPath);
     end;
-    Result := DerString(value as TJSONString, dataType, context);
+    Result := DerString(dataType, context);
   end
   else if dataType.Handle^.Kind = TTypeKind.tkLString then
   begin
-    if not(value is TJSONString) then
+    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstString
+    then
     begin
-      raise EDJError.Create(typeMismatch, context);
+      raise EDJError.Create(typeMismatch, context.GetPath);
     end;
-    Result := DerString(value as TJSONString, dataType, context);
+    Result := DerString(dataType, context);
   end
   else if dataType.Handle^.Kind = TTypeKind.tkClass then
   begin
-    if value is TJSONNull then
+    if context.stream.ReadGetType = TDJJSONStream.TDJJsonStreamTypes.djstNull
+    then
     begin
       Result := TValue.From<TObject>(nil);
     end
-    else if not(value is TJSONObject) then
+    else if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstObject
+    then
     begin
-      raise EDJError.Create(typeMismatch, context);
+      raise EDJError.Create(typeMismatch, context.GetPath);
     end
     else
     begin
-      Result := DerObject(value as TJSONObject, dataType, context, False);
+      Result := DerObject(dataType, context, False);
     end;
   end
   else if dataType.Handle^.Kind = TTypeKind.tkRecord then
   begin
-    if value is TJSONNull then
+    if context.stream.ReadGetType = TDJJSONStream.TDJJsonStreamTypes.djstNull
+    then
     begin
-      raise EDJError.Create('Record type can not be null. ', context);
+      raise EDJError.Create('Record type can not be null. ', context.GetPath);
     end;
 
-    if not(value is TJSONObject) then
+    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstObject
+    then
     begin
-      raise EDJError.Create(typeMismatch, context);
+      raise EDJError.Create(typeMismatch, context.GetPath);
     end;
 
-    Result := DerObject(value as TJSONObject, dataType, context, true);
+    Result := DerObject(dataType, context, true);
 
   end
   else
   begin
     raise EDJError.Create
-      ('Type of field is not supported for deserialization. ', context);
+      ('Type of field is not supported for deserialization. ', context.GetPath);
   end;
 end;
 
@@ -1764,7 +1829,7 @@ var
   tmp: TSerContext;
 begin
   tmp := nil;
-  raise EDJError.Create('Do not create instances of this object!', tmp);
+  raise EDJError.Create('Do not create instances of this object!', []);
 end;
 
 class function DelphiJSON<T>.Deserialize(data: String;
@@ -1780,7 +1845,7 @@ begin
     on E: EDJError do
     begin
       val.Free;
-      raise E.Clone;
+      raise;
     end;
   end;
   val.Free;
@@ -1803,17 +1868,18 @@ begin
 
   context := TDerContext.Create;
   context.settings := settings;
+  // TODO: set context json stream
 
   try
     rttiType := context.RTTI.GetType(System.TypeInfo(T));
-    res := DeserializeInternal(data, rttiType, context);
+    res := DeserializeInternal(rttiType, context);
   except
     on E: EDJError do
     begin
       context.FreeAllHeapObjects;
       context.Free;
       createdSettings.Free;
-      raise E.Clone;
+      raise;
     end;
   end;
 
@@ -1834,7 +1900,7 @@ begin
     on E: EDJError do
     begin
       JsonValue.Free;
-      raise E.Clone
+      raise;
     end;
   end;
   JsonValue.Free;
@@ -1856,29 +1922,23 @@ begin
 
   context := TSerContext.Create;
   context.settings := settings;
+  // TODO: set context stream
 
   try
     valueObject := TValue.From<T>(data);
-    Result := SerializeInternal(valueObject, context);
+    SerializeInternal(valueObject, context);
   except
     on E: EDJError do
     begin
       context.FreeAllHeapObjects;
       context.Free;
       createdSettings.Free;
-      raise E.Clone
+      raise;
     end;
   end;
 
   context.Free;
   createdSettings.Free;
-end;
-
-{ DJValueAttribute }
-
-constructor DJValueAttribute.Create(const Name: string);
-begin
-  self.Name := Name;
 end;
 
 { TSerContext }
@@ -1933,11 +1993,6 @@ begin
       obj.Free;
     end;
   end;
-end;
-
-function TSerContext.FullPath: string;
-begin
-  Result := PathToString(path);
 end;
 
 function TSerContext.GetPath: TArray<string>;
@@ -2056,11 +2111,6 @@ begin
   path.Push(val);
 end;
 
-function TSerContext.ToString: string;
-begin
-  Result := 'Context: { ' + FullPath + ' }';
-end;
-
 procedure TSerContext.Track(obj: TObject);
 begin
   if obj = nil then
@@ -2068,172 +2118,6 @@ begin
     exit;
   end;
   self.objectTracker.AddOrSetValue(obj, true);
-end;
-
-{ TDJSettings }
-
-constructor TDJSettings.Default;
-begin
-  RequireSerializableAttributeForNonRTLClasses := true;
-  DateTimeReturnUTC := true;
-  IgnoreNonNillable := False;
-  RequiredByDefault := true;
-  TreatStringDictionaryAsObject := true;
-  AllowUnusedJSONFields := true;
-end;
-
-{ DJDefaultValueAttribute }
-
-constructor DJDefaultValueAttribute.Create(const value: single);
-begin
-  self.value := TValue.From(value);
-end;
-
-constructor DJDefaultValueAttribute.Create(const value: integer);
-begin
-  self.value := TValue.From(value);
-end;
-
-constructor DJDefaultValueAttribute.Create(const value: string);
-begin
-  self.value := TValue.From(value);
-end;
-
-constructor DJDefaultValueAttribute.Create(const value: TValue);
-begin
-  self.value := value;
-end;
-
-function DJDefaultValueAttribute.GetValue: TValue;
-begin
-  Result := self.value;
-end;
-
-constructor DJDefaultValueAttribute.Create(const value: Boolean);
-begin
-  self.value := TValue.From(value);
-end;
-
-constructor DJDefaultValueAttribute.Create(const value: double);
-begin
-  self.value := TValue.From(value);
-end;
-
-{ DJDefaultValueCreatorAttribute<T> }
-
-function DJDefaultValueCreatorAttribute<T>.GetValue: TValue;
-begin
-  Result := TValue.From<T>(Generator());
-end;
-
-{ DJRequiredAttribute }
-
-constructor DJRequiredAttribute.Create(const required: Boolean);
-begin
-  self.required := required;
-end;
-
-{ EDJError }
-
-function EDJError.Clone: EDJError;
-begin
-  Result := EDJError.Create(self.errorMessage, self.path);
-end;
-
-constructor EDJError.Create(errorMessage: String; const path: TList<String>);
-begin
-  inherited Create(errorMessage + ' - ' + PathToString(path));
-  self.errorMessage := errorMessage;
-  self.path := TList<String>.Create(path);
-end;
-
-constructor EDJError.Create(errorMessage: String; context: TSerContext);
-begin
-  if context <> nil then
-  begin
-    inherited Create(errorMessage + ' - ' + context.FullPath);
-    self.errorMessage := errorMessage;
-    self.path := TList<String>.Create(context.path);
-  end
-  else
-  begin
-    inherited Create(errorMessage);
-    self.errorMessage := errorMessage;
-    self.path := nil;
-  end;
-end;
-
-destructor EDJError.Destroy;
-begin
-  self.path.Free;
-  self.path := nil;
-  inherited;
-end;
-
-function EDJError.FullPath: string;
-begin
-  Result := PathToString(path);
-end;
-
-{ DJConverterAttribute<T> }
-
-function DJConverterAttribute<T>.FromJSONinternal(value: TJSONValue): TValue;
-begin
-  Result := TValue.From<T>(self.FromJSON(value));
-end;
-
-function DJConverterAttribute<T>.ToJSONinternal(value: TValue): TJSONValue;
-begin
-  Result := ToJSON(value.AsType<T>());
-end;
-
-{ EDJRequiredError }
-
-function EDJRequiredError.Clone: EDJError;
-begin
-  Result := EDJRequiredError.Create(self.errorMessage, self.path);
-end;
-
-{ EDJNilError }
-
-function EDJNilError.Clone: EDJError;
-begin
-  Result := EDJNilError.Create(self.errorMessage, self.path);
-end;
-
-{ EDJWrongArraySizeError }
-
-function EDJWrongArraySizeError.Clone: EDJError;
-begin
-  Result := EDJWrongArraySizeError.Create(self.errorMessage, self.path);
-end;
-
-{ EDJCycleError }
-
-function EDJCycleError.Clone: EDJError;
-begin
-  Result := EDJCycleError.Create(self.errorMessage, self.path);
-end;
-
-{ EDJFormatError }
-
-function EDJFormatError.Clone: EDJError;
-begin
-  Result := EDJFormatError.Create(self.errorMessage, self.path);
-end;
-
-{ DJNoUnusedJSONFieldsAttribute }
-
-constructor DJNoUnusedJSONFieldsAttribute.Create(const noUnusedFields: Boolean);
-begin
-  self.noUnusedFields := noUnusedFields;
-end;
-
-{ EDJUnusedFieldsError }
-
-function EDJUnusedFieldsError.Clone: EDJError;
-begin
-  Result := EDJUnusedFieldsError.Create(self.errorMessage, self.path);
 end;
 
 end.
