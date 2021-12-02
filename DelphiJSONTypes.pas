@@ -357,6 +357,89 @@ type
   public
   end;
 
+  // Implementations of TDJJsonStream following
+
+  /// <summary>
+  /// Implementation of the TDJJsonStream for TJsonValue based input data.
+  /// </summary>
+  TDJTJsonValueStream = class(TDJJsonStream)
+  public
+    procedure ReadNext; override;
+    function ReadIsDone: Boolean; override;
+    function ReadGetType: TDJJsonStream.TDJJsonStreamTypes; override;
+    procedure ReadStepInto; override;
+    procedure ReadStepOut; override;
+    function ReadIsRoot: Boolean; override;
+    function ReadPropertyName: String; override;
+    function ReadValueIsNull: Boolean; override;
+    function ReadValueBoolean: Boolean; override;
+    function ReadValueString: string; override;
+    function ReadValueInteger: Int64; override;
+    function ReadValueFloat: double; override;
+
+  public
+    procedure WriteSetNextPropertyName(const propertyName: string); override;
+    procedure WriteBeginObject(const propertyName: string = ''); override;
+    procedure WriteEndObject; override;
+    procedure WriteBeginArray(const propertyName: string = ''); override;
+    procedure WriteEndArray; override;
+    procedure WriteValueNull(const propertyName: string = ''); override;
+    procedure WriteValueBoolean(value: Boolean;
+      const propertyName: string = ''); override;
+    procedure WriteValueString(const value: string;
+      const propertyName: string = ''); override;
+    procedure WriteValueInteger(const value: Int64;
+      const propertyName: string = ''); override;
+    procedure WriteValueFloat(const value: double;
+      const propertyName: string = ''); override;
+
+  public
+    constructor CreateReader(value: TJSONValue;
+      readRootValueOwnedByStream: Boolean = false);
+    constructor CreateWriter;
+
+    destructor Destroy; override;
+
+    /// <summary>
+    /// Returns the written value. Note that the written value is still hold by
+    /// the stream and freed when the stream is freed.
+    /// </summary>
+    function ViewWrittenValue: TJSONValue;
+
+    /// <summary>
+    /// Returns the written value and removes it from the stream. The stream is
+    /// afterwards in an invalid state and can only be freed. The returned value
+    /// will not be freed by the stream or when the stream gets freed.
+    /// </summary>
+    function ExtractWrittenValue: TJSONValue;
+
+  private
+    isInReadMode: Boolean;
+
+    // read related data structures
+    readActiveValue: TStack<TJSONValue>;
+    readPointer: TStack<Integer>;
+    readRootValue: TJSONValue;
+    readRootValueOwnedByStream: Boolean;
+
+    // write related data structures
+    writeNextPropertyName: String;
+    writeActiveValue: TStack<TJSONValue>;
+    writeRootValue: TJSONValue;
+
+    function ReadGetPointedTJSONValue: TJSONValue;
+    function ReadGetPointedPropertyName: String;
+    procedure WriteJsonValue(value: TJSONValue; propertyName: string = '');
+    function WriteGetFinalPropertyName(propertyName: string): string;
+    function WriteGetActiveValue: TJSONValue;
+
+  private
+    // utilities
+    class function GetTypeOfValue(value: TJSONValue)
+      : TDJJsonStream.TDJJsonStreamTypes;
+
+  end;
+
 implementation
 
 { TDJJsonStream }
@@ -498,7 +581,7 @@ constructor TDJSettings.Default;
 begin
   RequireSerializableAttributeForNonRTLClasses := true;
   DateTimeReturnUTC := true;
-  IgnoreNonNillable := False;
+  IgnoreNonNillable := false;
   RequiredByDefault := true;
   TreatStringDictionaryAsObject := true;
   AllowUnusedJSONFields := true;
@@ -539,6 +622,594 @@ begin
       Result := Result + '>' + ele;
     end;
   end;
+end;
+
+{ TDJTJsonValueStream }
+
+constructor TDJTJsonValueStream.CreateReader(value: TJSONValue;
+  readRootValueOwnedByStream: Boolean);
+begin
+  self.isInReadMode := true;
+  self.readActiveValue := TStack<TJSONValue>.Create;
+  self.readPointer := TStack<Integer>.Create;
+  self.readRootValue := value;
+  self.readRootValueOwnedByStream := readRootValueOwnedByStream;
+end;
+
+constructor TDJTJsonValueStream.CreateWriter;
+begin
+  self.isInReadMode := false;
+  self.writeNextPropertyName := '';
+  self.writeActiveValue := TStack<TJSONValue>.Create;
+  self.writeRootValue := nil;
+end;
+
+destructor TDJTJsonValueStream.Destroy;
+begin
+  if isInReadMode then
+  begin
+    FreeAndNil(readActiveValue);
+    FreeAndNil(readPointer);
+    if self.readRootValueOwnedByStream then
+    begin
+      FreeAndNil(self.readRootValue);
+    end;
+  end
+  else
+  begin
+    FreeAndNil(writeActiveValue);
+    FreeAndNil(writeRootValue);
+  end;
+  inherited;
+end;
+
+function TDJTJsonValueStream.ExtractWrittenValue: TJSONValue;
+begin
+  Result := self.writeRootValue;
+  self.writeRootValue := nil;
+end;
+
+class function TDJTJsonValueStream.GetTypeOfValue(value: TJSONValue)
+  : TDJJsonStream.TDJJsonStreamTypes;
+begin
+  Result := djstNull;
+  if value is TJSONNull then
+  begin
+    Result := djstNull;
+  end
+  else if value is TJSONBool then
+  begin
+    Result := djstBoolean;
+  end
+  else if value is TJSONString then
+  begin
+    Result := djstString;
+  end
+  else if value is TJSONObject then
+  begin
+    Result := djstObject;
+  end
+  else if value is TJSONArray then
+  begin
+    Result := djstArray;
+  end
+  else if value is TJSONNumber then
+  begin
+    if value.ToJSON.Contains('.') then
+    begin
+      Result := djstNumberFloat;
+    end
+    else
+    begin
+      Result := djstNumberInt;
+    end;
+  end;
+end;
+
+function TDJTJsonValueStream.ReadGetPointedPropertyName: String;
+var
+  activeValue: TJSONValue;
+  pointer: Integer;
+  obj: TJSONObject;
+begin
+  if self.readActiveValue.Count = 0 then
+  begin
+    raise exception.Create('No active object!');
+  end
+  else
+  begin
+    activeValue := self.readActiveValue.Peek;
+    pointer := self.readPointer.Peek;
+    if activeValue is TJSONObject then
+    begin
+      obj := activeValue as TJSONObject;
+      if obj.Count >= pointer then
+      begin
+        raise exception.Create('Pointer out of bounds');
+      end
+      else
+      begin
+        Result := obj.Pairs[pointer].JsonString.value;
+      end;
+    end
+    else
+    begin
+      raise exception.Create('Active value has illegal type!');
+    end;
+  end;
+end;
+
+function TDJTJsonValueStream.ReadGetPointedTJSONValue: TJSONValue;
+var
+  activeValue: TJSONValue;
+  pointer: Integer;
+  arr: TJSONArray;
+  obj: TJSONObject;
+begin
+  if self.readActiveValue.Count = 0 then
+  begin
+    Result := self.readRootValue;
+  end
+  else
+  begin
+    activeValue := self.readActiveValue.Peek;
+    pointer := self.readPointer.Peek;
+
+    if activeValue is TJSONArray then
+    begin
+      arr := activeValue as TJSONArray;
+      if arr.Count >= pointer then
+      begin
+        Result := nil;
+      end
+      else
+      begin
+        Result := arr[pointer];
+      end;
+    end
+    else if activeValue is TJSONObject then
+    begin
+      obj := activeValue as TJSONObject;
+      if obj.Count >= pointer then
+      begin
+        Result := nil;
+      end
+      else
+      begin
+        Result := obj.Pairs[pointer].JsonValue;
+      end;
+    end
+    else
+    begin
+      raise exception.Create('Active value has illegal type!');
+    end;
+  end;
+end;
+
+function TDJTJsonValueStream.ReadGetType: TDJJsonStream.TDJJsonStreamTypes;
+var
+  pointedValue: TJSONValue;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+  pointedValue := self.ReadGetPointedTJSONValue;
+  Result := TDJTJsonValueStream.GetTypeOfValue(pointedValue);
+end;
+
+function TDJTJsonValueStream.ReadIsDone: Boolean;
+var
+  pointedValue: TJSONValue;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+  pointedValue := self.ReadGetPointedTJSONValue;
+  if pointedValue = nil then
+  begin
+    Result := true;
+  end
+  else
+  begin
+    Result := false;
+  end;
+end;
+
+function TDJTJsonValueStream.ReadIsRoot: Boolean;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+  Result := self.readActiveValue.Count = 0;
+end;
+
+procedure TDJTJsonValueStream.ReadNext;
+var
+  pointer: Integer;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+  if self.readActiveValue.Count = 0 then
+  begin
+    raise exception.Create('Active value is not an array or object!');
+  end;
+
+  pointer := self.readPointer.Pop;
+  Inc(pointer);
+  self.readPointer.Push(pointer);
+end;
+
+function TDJTJsonValueStream.ReadPropertyName: String;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+  if self.readActiveValue.Count = 0 then
+  begin
+    raise exception.Create('Active value is not an object!');
+  end;
+  if not(self.readActiveValue.Peek is TJSONObject) then
+  begin
+    raise exception.Create('Active value is not an object!');
+  end;
+
+  Result := self.ReadGetPointedPropertyName;
+end;
+
+procedure TDJTJsonValueStream.ReadStepInto;
+var
+  pointedValue: TJSONValue;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+  pointedValue := self.ReadGetPointedTJSONValue;
+  if pointedValue = nil then
+  begin
+    raise exception.Create('Pointer is not pointing towards any value');
+  end;
+
+  if (not(pointedValue is TJSONObject)) and (not(pointedValue is TJSONArray))
+  then
+  begin
+    raise exception.Create('Pointed value is not an array or object');
+  end;
+
+  self.readActiveValue.Push(pointedValue);
+  self.readPointer.Push(0);
+end;
+
+procedure TDJTJsonValueStream.ReadStepOut;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+
+  if self.readActiveValue.Count = 0 then
+  begin
+    raise exception.Create('Can not step out if not inside an object or array');
+  end;
+
+  self.readActiveValue.Pop;
+  self.readPointer.Pop;
+end;
+
+function TDJTJsonValueStream.ReadValueBoolean: Boolean;
+var
+  pointedValue: TJSONValue;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+  pointedValue := ReadGetPointedTJSONValue;
+  if not(pointedValue is TJSONBool) then
+  begin
+    raise exception.Create
+      ('Invalid type of json value! Check type before accessing the value');
+  end;
+  Result := (pointedValue as TJSONBool).AsBoolean;
+end;
+
+function TDJTJsonValueStream.ReadValueFloat: double;
+var
+  pointedValue: TJSONValue;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+  pointedValue := ReadGetPointedTJSONValue;
+  if not(pointedValue is TJSONNumber) then
+  begin
+    raise exception.Create
+      ('Invalid type of json value! Check type before accessing the value');
+  end;
+  Result := (pointedValue as TJSONNumber).AsDouble;
+end;
+
+function TDJTJsonValueStream.ReadValueInteger: Int64;
+var
+  pointedValue: TJSONValue;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+  pointedValue := ReadGetPointedTJSONValue;
+  if not(pointedValue is TJSONNumber) then
+  begin
+    raise exception.Create
+      ('Invalid type of json value! Check type before accessing the value');
+  end;
+  Result := (pointedValue as TJSONNumber).AsInt64;
+end;
+
+function TDJTJsonValueStream.ReadValueIsNull: Boolean;
+var
+  pointedValue: TJSONValue;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+  pointedValue := ReadGetPointedTJSONValue;
+  Result := pointedValue is TJSONNull;
+end;
+
+function TDJTJsonValueStream.ReadValueString: string;
+var
+  pointedValue: TJSONValue;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+  pointedValue := ReadGetPointedTJSONValue;
+  if not(pointedValue is TJSONString) then
+  begin
+    raise exception.Create
+      ('Invalid type of json value! Check type before accessing the value');
+  end;
+  Result := (pointedValue as TJSONString).value;
+end;
+
+function TDJTJsonValueStream.ViewWrittenValue: TJSONValue;
+begin
+  Result := self.writeRootValue;
+end;
+
+procedure TDJTJsonValueStream.WriteBeginArray(const propertyName: string);
+var
+  arr: TJSONArray;
+begin
+  if self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is read only but a write method was called!');
+  end;
+  arr := TJSONArray.Create;
+  self.WriteJsonValue(arr, propertyName);
+  self.writeActiveValue.Push(arr);
+end;
+
+procedure TDJTJsonValueStream.WriteBeginObject(const propertyName: string);
+var
+  obj: TJSONObject;
+begin
+  if self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is read only but a write method was called!');
+  end;
+  obj := TJSONObject.Create;
+  self.WriteJsonValue(obj, propertyName);
+  self.writeActiveValue.Push(obj);
+end;
+
+procedure TDJTJsonValueStream.WriteEndArray;
+var
+  activeValue: TJSONValue;
+begin
+  if self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is read only but a write method was called!');
+  end;
+  if self.writeActiveValue.Count = 0 then
+  begin
+    raise exception.Create('Active value is not an array!');
+  end;
+  activeValue := self.writeActiveValue.Peek;
+  if not(activeValue is TJSONArray) then
+  begin
+    raise exception.Create('Active value is not an array!');
+  end;
+  self.writeActiveValue.Pop;
+end;
+
+procedure TDJTJsonValueStream.WriteEndObject;
+var
+  activeValue: TJSONValue;
+begin
+  if self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is read only but a write method was called!');
+  end;
+  if self.writeActiveValue.Count = 0 then
+  begin
+    raise exception.Create('Active value is not an object!');
+  end;
+  activeValue := self.writeActiveValue.Peek;
+  if not(activeValue is TJSONObject) then
+  begin
+    raise exception.Create('Active value is not an object!');
+  end;
+  self.writeActiveValue.Pop;
+end;
+
+function TDJTJsonValueStream.WriteGetActiveValue: TJSONValue;
+begin
+  if self.writeActiveValue.Count = 0 then
+  begin
+    Result := self.writeRootValue;
+  end
+  else
+  begin
+    Result := self.writeActiveValue.Peek;
+  end;
+end;
+
+function TDJTJsonValueStream.WriteGetFinalPropertyName
+  (propertyName: string): string;
+begin
+  Result := self.writeNextPropertyName;
+  self.writeNextPropertyName := '';
+  if propertyName <> '' then
+  begin
+    Result := propertyName;
+  end;
+end;
+
+procedure TDJTJsonValueStream.WriteJsonValue(value: TJSONValue;
+  propertyName: string);
+var
+  finalPropertyName: string;
+  activeValue: TJSONValue;
+  obj: TJSONObject;
+  arr: TJSONArray;
+begin
+  finalPropertyName := WriteGetFinalPropertyName(propertyName);
+
+  activeValue := WriteGetActiveValue;
+  if activeValue = nil then
+  begin
+    if propertyName <> '' then
+    begin
+      raise exception.Create
+        ('Cannot have property names on an active value that is not an object!');
+    end;
+    self.writeRootValue := value;
+  end
+  else
+  begin
+    if activeValue is TJSONArray then
+    begin
+      if propertyName <> '' then
+      begin
+        raise exception.Create
+          ('Cannot have property names on an active value that is not an object!');
+      end;
+      arr := activeValue as TJSONArray;
+      arr.AddElement(value);
+    end
+    else if activeValue is TJSONObject then
+    begin
+      if propertyName = '' then
+      begin
+        raise exception.Create('Cannot have an empty property name!');
+      end;
+      obj := activeValue as TJSONObject;
+      if obj.Get(propertyName) <> nil then
+      begin
+        raise exception.Create
+          ('Object already has a property with the specified name!');
+      end;
+      obj.AddPair(propertyName, value);
+    end
+    else
+    begin
+      raise exception.Create
+        ('Cannot add a value to an active object that is neither an array nor an object!');
+    end;
+  end;
+
+end;
+
+procedure TDJTJsonValueStream.WriteSetNextPropertyName
+  (const propertyName: string);
+begin
+  if self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is read only but a write method was called!');
+  end;
+  self.writeNextPropertyName := propertyName;
+end;
+
+procedure TDJTJsonValueStream.WriteValueBoolean(value: Boolean;
+  const propertyName: string);
+begin
+  if self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is read only but a write method was called!');
+  end;
+  self.WriteJsonValue(TJSONBool.Create(value), propertyName);
+end;
+
+procedure TDJTJsonValueStream.WriteValueFloat(const value: double;
+  const propertyName: string);
+begin
+  if self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is read only but a write method was called!');
+  end;
+  self.WriteJsonValue(TJSONNumber.Create(value), propertyName);
+end;
+
+procedure TDJTJsonValueStream.WriteValueInteger(const value: Int64;
+  const propertyName: string);
+begin
+  if self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is read only but a write method was called!');
+  end;
+  self.WriteJsonValue(TJSONNumber.Create(value), propertyName);
+end;
+
+procedure TDJTJsonValueStream.WriteValueNull(const propertyName: string);
+begin
+  if self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is read only but a write method was called!');
+  end;
+  self.WriteJsonValue(TJSONNull.Create, propertyName);
+end;
+
+procedure TDJTJsonValueStream.WriteValueString(const value,
+  propertyName: string);
+begin
+  if self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is read only but a write method was called!');
+  end;
+  self.WriteJsonValue(TJSONString.Create(value), propertyName);
 end;
 
 end.
