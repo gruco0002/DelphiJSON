@@ -419,8 +419,58 @@ end;
 
 procedure SerUsingConverter(value: TValue; dataType: TRttiType;
   converter: IDJConverterInterface; context: TSerContext);
+var
+  converterType: TRttiType;
+  streamType: TRttiType;
+  methods: TArray<TRttiMethod>;
+  method: TRttiMethod;
+  parameters: TArray<TRttiParameter>;
+  typeParameter: TRttiParameter;
+  streamParameter: TRttiParameter;
 begin
-  // TODO: implement
+  // The following function needs to be implemented in the converter
+  // procedure ToJSON(value: T; stream: TDJJsonStream); virtual; abstract;
+
+  converterType := context.RTTI.GetType(converter.ClassType);
+  streamType := context.RTTI.GetType(System.TypeInfo(TDJJSONStream));
+
+  // get "ToJSON" method from converter
+  methods := converterType.GetMethods('ToJSON');
+  if Length(methods) = 0 then
+  begin
+    raise EDJError.Create('Could not find method "ToJSON" on converter!',
+      context.GetPath);
+  end;
+  method := methods[Low(methods)];
+
+  // get parameters types and verify their correctness
+  parameters := method.GetParameters;
+  if Length(parameters) <> 2 then
+  begin
+    raise EDJError.Create
+      ('Invalid amount of parameters for method "ToJSON" on converter!',
+      context.GetPath);
+  end;
+  typeParameter := parameters[Low(parameters)];
+  streamParameter := parameters[Low(parameters) + 1];
+
+  if typeParameter.ParamType <> dataType then
+  begin
+    raise EDJError.Create
+      ('Type of data field does not match the fields type for method "ToJSON" on converter!',
+      context.GetPath);
+  end;
+
+  if streamParameter.ParamType <> streamType then
+  begin
+    raise EDJError.Create
+      ('Type of stream field does not match TDJJsonStream for method "ToJSON" on converter!',
+      context.GetPath);
+  end;
+
+  // invoke the method after everything else seems fine
+  method.Invoke(converter, [value, TValue.From<TDJJSONStream>(context.stream)]);
+
 end;
 
 procedure SerObject(value: TValue; context: TSerContext; isRecord: Boolean);
@@ -1439,7 +1489,6 @@ begin
       end;
     end;
 
-    // TODO: FIX STUFF FROM HERE ON DOWNWARDS
     objectFields := dataType.GetFields;
     for rttifield in objectFields do
     begin
