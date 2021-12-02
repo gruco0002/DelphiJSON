@@ -3,7 +3,7 @@ unit ArrayTests;
 interface
 
 uses
-  DUnitX.TestFramework, DelphiJSON;
+  DUnitX.TestFramework;
 
 type
 
@@ -27,7 +27,7 @@ type
 implementation
 
 uses
-  System.JSON, JSONComparer;
+  System.JSON, JSONComparer, DelphiJSON, DelphiJSONTypes;
 
 { TArrayTests }
 

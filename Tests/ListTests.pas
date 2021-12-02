@@ -3,7 +3,7 @@ unit ListTests;
 interface
 
 uses
-  DUnitX.TestFramework, System.Generics.Collections, DelphiJSON;
+  DUnitX.TestFramework, System.Generics.Collections, DelphiJSONAttributes;
 
 type
 
@@ -36,7 +36,7 @@ type
 implementation
 
 uses
-  System.JSON, JSONComparer;
+  System.JSON, JSONComparer, DelphiJSON;
 
 { TListTests }
 

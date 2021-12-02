@@ -3,7 +3,7 @@ unit SerializableAttrTests;
 interface
 
 uses
-  DUnitX.TestFramework, DelphiJSON;
+  DUnitX.TestFramework, DelphiJSONAttributes;
 
 type
 
@@ -35,7 +35,7 @@ type
 implementation
 
 uses
-  System.JSON, JSONComparer;
+  System.JSON, JSONComparer, DelphiJSON, DelphiJSONTypes;
 
 { TSerializableAttrTests }
 

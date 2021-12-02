@@ -32,7 +32,8 @@ type
 implementation
 
 uses
-  JSONComparer, DelphiJSON, System.JSON, System.Generics.Collections;
+  JSONComparer, DelphiJSON, DelphiJSONAttributes, System.JSON,
+  System.Generics.Collections;
 
 type
 
@@ -85,10 +86,8 @@ begin
   Assert.AreEqual('seven', tmp.data[7]);
   Assert.IsFalse(tmp.data.ContainsKey(1));
 
-
   tmp.data.Free;
   tmp.Free;
-
 
 end;
 

@@ -3,13 +3,13 @@ unit ConverterTests;
 interface
 
 uses
-  DUnitX.TestFramework, DelphiJSON, System.JSON;
+  DUnitX.TestFramework, DelphiJSONAttributes, DelphiJSONTypes;
 
 type
   TUpperConv = class(DJConverterAttribute<String>)
   public
-    function ToJSON(value: String): TJSONValue; override;
-    function FromJSON(value: TJSONValue): String; override;
+    procedure ToJSON(value: String; stream: TDJJsonStream); override;
+    function FromJSON(stream: TDJJsonStream): String; override;
   end;
 
   [DJSerializableAttribute]
@@ -36,22 +36,22 @@ type
 implementation
 
 uses
-  System.SysUtils, System.StrUtils, JSONComparer;
+  System.SysUtils, System.StrUtils, JSONComparer, DelphiJSON, System.JSON;
 
 { TUpperConv }
 
-function TUpperConv.FromJSON(value: TJSONValue): String;
+function TUpperConv.FromJSON(stream: TDJJsonStream): String;
 begin
-  if not(value is TJSONString) then
+  if stream.ReadGetType <> TDJJsonStream.TDJJsonStreamTypes.djstString then
   begin
     raise EDJError.Create('wrong type', nil);
   end;
-  Result := (value as TJSONString).value.toUpper;
+  Result := stream.ReadValueString.toUpper;
 end;
 
-function TUpperConv.ToJSON(value: String): TJSONValue;
+procedure TUpperConv.ToJSON(value: String; stream: TDJJsonStream);
 begin
-  Result := TJSONString.Create(value.toUpper);
+  stream.WriteValueString(value.toUpper);
 end;
 
 { TConverterTests }

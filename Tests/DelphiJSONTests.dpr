@@ -5,11 +5,11 @@ program DelphiJSONTests;
 {$ENDIF}{$STRONGLINKTYPES ON}
 
 uses
-
+  FastMM4,
   System.SysUtils,
-  {$IFDEF TESTINSIGHT}
+{$IFDEF TESTINSIGHT}
   TestInsight.DUnitX,
-  {$ENDIF }
+{$ENDIF }
   DUnitX.Loggers.Console,
   DUnitX.Loggers.Xml.NUnit,
   DUnitX.TestFramework,

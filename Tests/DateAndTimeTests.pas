@@ -43,7 +43,7 @@ type
 implementation
 
 uses
-  DelphiJSON, System.SysUtils, System.DateUtils, JSONComparer, System.JSON;
+  DelphiJSON, System.SysUtils, System.DateUtils, JSONComparer, System.JSON, DelphiJSONTypes;
 
 { TDateAndTimeTests }
 

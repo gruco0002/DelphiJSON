@@ -3,7 +3,7 @@ unit DictionaryTests;
 interface
 
 uses
-  DUnitX.TestFramework, DelphiJSON, System.Generics.Collections;
+  DUnitX.TestFramework;
 
 type
 
@@ -34,7 +34,8 @@ type
 implementation
 
 uses
-  System.JSON, JSONComparer;
+  System.JSON, JSONComparer, DelphiJSON, System.Generics.Collections,
+  DelphiJSONTypes;
 
 { TDictionaryTests }
 

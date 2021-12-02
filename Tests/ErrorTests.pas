@@ -3,7 +3,7 @@ unit ErrorTests;
 interface
 
 uses
-  DUnitX.TestFramework, DelphiJSON, System.Generics.Collections;
+  DUnitX.TestFramework, DelphiJSONAttributes, System.Generics.Collections;
 
 type
 
@@ -32,6 +32,9 @@ type
   end;
 
 implementation
+
+uses
+  DelphiJSON, DelphiJSONTypes;
 
 { TErrorTests }
 

@@ -3,7 +3,7 @@ unit CycleTests;
 interface
 
 uses
-  DUnitX.TestFramework, DelphiJSON;
+  DUnitX.TestFramework, DelphiJSONAttributes;
 
 type
 
@@ -33,6 +33,9 @@ type
   end;
 
 implementation
+
+uses
+  DelphiJSON, DelphiJSONTypes;
 
 { TCycleTests }
 
