@@ -1402,9 +1402,61 @@ begin
 end;
 
 function DerUsingConverter(dataType: TRttiType; context: TDerContext;
-  attr: IDJConverterInterface): TValue;
+  converter: IDJConverterInterface): TValue;
+var
+  converterType: TRttiType;
+  streamType: TRttiType;
+  methods: TArray<TRttiMethod>;
+  method: TRttiMethod;
+  parameters: TArray<TRttiParameter>;
+  resultType: TRttiType;
+  streamParameter: TRttiParameter;
 begin
-  // TODO: implement
+  // The following function needs to be implemented in the converter
+  // function FromJSON(stream: TDJJsonStream): T; virtual; abstract;
+
+  converterType := context.RTTI.GetType(converter.ClassType);
+  streamType := context.RTTI.GetType(System.TypeInfo(TDJJSONStream));
+
+  // get "ToJSON" method from converter
+  methods := converterType.GetMethods('FromJSON');
+  if Length(methods) = 0 then
+  begin
+    raise EDJError.Create('Could not find method "FromJSON" on converter!',
+      context.GetPath);
+  end;
+  method := methods[Low(methods)];
+
+  // get parameter and result types and verify their correctness
+  parameters := method.GetParameters;
+  if Length(parameters) <> 1 then
+  begin
+    raise EDJError.Create
+      ('Invalid amount of parameters for method "FromJSON" on converter!',
+      context.GetPath);
+  end;
+
+  resultType := method.ReturnType;
+  streamParameter := parameters[Low(parameters)];
+
+  if resultType <> dataType then
+  begin
+    raise EDJError.Create
+      ('Result type does not match the annotated fields type for method "FromJSON" on converter!',
+      context.GetPath);
+  end;
+
+  if streamParameter.ParamType <> streamType then
+  begin
+    raise EDJError.Create
+      ('Type of stream field does not match TDJJsonStream for method "FromJSON" on converter!',
+      context.GetPath);
+  end;
+
+  // invoke the method after everything else seems fine
+  Result := method.Invoke(converter,
+    [TValue.From<TDJJSONStream>(context.stream)]);
+
 end;
 
 function DerObject(dataType: TRttiType; context: TDerContext;
