@@ -2038,7 +2038,7 @@ begin
 
   context := TDerContext.Create;
   context.settings := settings;
-  // TODO: set context json stream
+  context.stream := TDJTJsonValueStream.CreateReader(data);
 
   try
     rttiType := context.RTTI.GetType(System.TypeInfo(T));
@@ -2092,11 +2092,12 @@ begin
 
   context := TSerContext.Create;
   context.settings := settings;
-  // TODO: set context stream
+  context.stream := TDJTJsonValueStream.CreateWriter;
 
   try
     valueObject := TValue.From<T>(data);
     SerializeInternal(valueObject, context);
+    Result := (context.stream as TDJTJsonValueStream).ExtractWrittenValue;
   except
     on E: EDJError do
     begin
@@ -2136,6 +2137,7 @@ begin
   self.heapAllocatedObjects := nil;
   self.objectTracker.Free;
   self.objectTracker := nil;
+  self.stream.Free;
 end;
 
 procedure TSerContext.FreeAllHeapObjects;
