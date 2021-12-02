@@ -24,7 +24,7 @@ type
 
 implementation
 
-uses DelphiJSON, System.JSON, JSONComparer;
+uses DelphiJSON, DelphiJSONAttributes, System.JSON, JSONComparer;
 
 const
   notSerText = 'not (de)serialized';
