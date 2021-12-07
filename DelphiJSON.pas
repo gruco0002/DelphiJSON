@@ -1012,7 +1012,7 @@ begin
   typeValue := addMethod.GetParameters[1].ParamType;
 
   i := 0;
-  while context.stream.ReadIsDone do
+  while not context.stream.ReadIsDone do
   begin
     context.PushPath(i);
 
