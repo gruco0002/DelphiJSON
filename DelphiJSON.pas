@@ -130,7 +130,7 @@ function DeserializeInternal(dataType: TRttiType; context: TDerContext): TValue;
 implementation
 
 uses
-  System.TypInfo, System.DateUtils;
+  System.TypInfo, System.DateUtils, System.Variants;
 
 procedure SerArray(value: TValue; context: TSerContext);
 var
@@ -1445,6 +1445,19 @@ begin
     // get the variant result
     variantResult := method.Invoke(attr, []);
     variantValue := variantResult.AsType<Variant>;
+
+    // convert single to double or the other way around if required
+    if (VarType(variantValue) = varSingle) and
+      (dataType = context.RTTI.GetType(System.TypeInfo(double))) then
+    begin
+      variantValue := VarAsType(variantValue, varDouble);
+    end
+    else if (VarType(variantValue) = varDouble) and
+      (dataType = context.RTTI.GetType(System.TypeInfo(single))) then
+    begin
+      variantValue := VarAsType(variantValue, varSingle);
+    end;
+
     Result := TValue.FromVariant(variantValue);
 
     // check its type integrity
