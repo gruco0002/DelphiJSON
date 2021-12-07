@@ -723,7 +723,7 @@ begin
     if activeValue is TJSONObject then
     begin
       obj := activeValue as TJSONObject;
-      if obj.Count >= pointer then
+      if pointer >= obj.Count then
       begin
         raise exception.Create('Pointer out of bounds');
       end
@@ -758,7 +758,7 @@ begin
     if activeValue is TJSONArray then
     begin
       arr := activeValue as TJSONArray;
-      if arr.Count >= pointer then
+      if pointer >= arr.Count then
       begin
         Result := nil;
       end
@@ -770,7 +770,7 @@ begin
     else if activeValue is TJSONObject then
     begin
       obj := activeValue as TJSONObject;
-      if obj.Count >= pointer then
+      if pointer >= obj.Count then
       begin
         Result := nil;
       end
