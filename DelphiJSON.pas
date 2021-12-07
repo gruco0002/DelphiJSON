@@ -854,7 +854,6 @@ begin
 
       Inc(i);
       context.stream.ReadNext;
-
     end;
     Result := TValue.FromArray(dataType.Handle, res);
   end
@@ -878,14 +877,16 @@ begin
       Inc(i);
       context.stream.ReadNext;
     end;
-    Result := TValue.FromArray(staticType.Handle, res);
 
+    // check length of array
     if staticType.TotalElementCount <> Length(res) then
     begin
       raise EDJWrongArraySizeError.Create
         ('Element count of the given JSON array does not match the size of a static array. ',
         context.GetPath);
     end;
+
+    Result := TValue.FromArray(staticType.Handle, res);
   end;
 
   context.stream.ReadStepOut;
