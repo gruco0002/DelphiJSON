@@ -681,10 +681,6 @@ begin
   begin
     Result := djstBoolean;
   end
-  else if value is TJSONString then
-  begin
-    Result := djstString;
-  end
   else if value is TJSONObject then
   begin
     Result := djstObject;
@@ -703,6 +699,10 @@ begin
     begin
       Result := djstNumberInt;
     end;
+  end
+  else if value is TJSONString then
+  begin
+    Result := djstString;
   end;
 end;
 
