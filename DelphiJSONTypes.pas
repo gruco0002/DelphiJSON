@@ -1105,7 +1105,7 @@ begin
   activeValue := WriteGetActiveValue;
   if activeValue = nil then
   begin
-    if propertyName <> '' then
+    if finalPropertyName <> '' then
     begin
       raise exception.Create
         ('Cannot have property names on an active value that is not an object!');
@@ -1116,7 +1116,7 @@ begin
   begin
     if activeValue is TJSONArray then
     begin
-      if propertyName <> '' then
+      if finalPropertyName <> '' then
       begin
         raise exception.Create
           ('Cannot have property names on an active value that is not an object!');
@@ -1126,17 +1126,17 @@ begin
     end
     else if activeValue is TJSONObject then
     begin
-      if propertyName = '' then
+      if finalPropertyName = '' then
       begin
         raise exception.Create('Cannot have an empty property name!');
       end;
       obj := activeValue as TJSONObject;
-      if obj.Get(propertyName) <> nil then
+      if obj.Get(finalPropertyName) <> nil then
       begin
         raise exception.Create
           ('Object already has a property with the specified name!');
       end;
-      obj.AddPair(propertyName, value);
+      obj.AddPair(finalPropertyName, value);
     end
     else
     begin
