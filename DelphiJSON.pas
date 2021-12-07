@@ -1908,8 +1908,9 @@ begin
   end
   else if dataType.Handle^.Kind = TTypeKind.tkFloat then
   begin
-    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstNumberFloat
-    then
+    if not(context.stream.ReadGetType
+      in [TDJJSONStream.TDJJsonStreamTypes.djstNumberFloat,
+      TDJJSONStream.TDJJsonStreamTypes.djstNumberInt]) then
     begin
       raise EDJError.Create(typeMismatch, context.GetPath);
     end;
