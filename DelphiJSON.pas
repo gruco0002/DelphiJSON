@@ -267,7 +267,7 @@ type
   DJRequiredAttribute = class(TCustomAttribute)
   public
     required: Boolean;
-    constructor Create(const required: Boolean = true);
+    constructor Create(const required: Boolean = True);
   end;
 
   /// <summary>
@@ -314,7 +314,7 @@ type
   DJNoUnusedJSONFieldsAttribute = class(TCustomAttribute)
   public
     noUnusedFields: Boolean;
-    constructor Create(const noUnusedFields: Boolean = true);
+    constructor Create(const noUnusedFields: Boolean = True);
   end;
 
   TSerContext = class;
@@ -713,51 +713,51 @@ begin
   begin
     if tmp.Name.ToLower = 'tdatetime' then
     begin
-      Result := true;
+      Result := True;
       output := SerTDateTime(data, dataType, context);
       exit;
     end;
 
     if tmp.Name.ToLower = 'tdate' then
     begin
-      Result := true;
+      Result := True;
       output := SerTDate(data, dataType, context);
       exit;
     end;
 
     if tmp.Name.ToLower = 'ttime' then
     begin
-      Result := true;
+      Result := True;
       output := SerTTime(data, dataType, context);
       exit;
     end;
 
     if tmp.Name.ToLower = 'tjsonvalue' then
     begin
-      Result := true;
+      Result := True;
       output := SerTJSONValue(data, dataType, context);
       exit;
     end;
 
     if context.settings.TreatStringDictionaryAsObject and
-      (tmp.Name.ToLower.StartsWith('tdictionary<system.string,', true) or
-      tmp.Name.ToLower.StartsWith('tdictionary<string,', true)) then
+      (tmp.Name.ToLower.StartsWith('tdictionary<system.string,', True) or
+      tmp.Name.ToLower.StartsWith('tdictionary<string,', True)) then
     begin
-      Result := true;
+      Result := True;
       output := SerTDictionaryStringKey(data.AsObject, dataType, context);
       exit;
     end;
 
-    if tmp.Name.ToLower.StartsWith('tpair<', true) then
+    if tmp.Name.ToLower.StartsWith('tpair<', True) then
     begin
-      Result := true;
+      Result := True;
       output := SerTPair(data, dataType, context);
       exit;
     end;
 
-    if tmp.Name.ToLower.StartsWith('tenumerable<', true) then
+    if tmp.Name.ToLower.StartsWith('tenumerable<', True) then
     begin
-      Result := true;
+      Result := True;
       output := SerTEnumerable(data.AsObject, dataType, context);
       exit;
     end;
@@ -802,7 +802,7 @@ begin
     begin
       if attribute is DJSerializableAttribute then
       begin
-        found := true;
+        found := True;
         break;
       end;
     end;
@@ -825,7 +825,7 @@ begin
   begin
     // default values for properties
     found := False;
-    nillable := true;
+    nillable := True;
     converter := nil;
 
     // check for the attributes
@@ -834,7 +834,7 @@ begin
       if attribute is DJValueAttribute then
       begin
         // found the value attribute (this needs to be serialized)
-        found := true;
+        found := True;
         jsonFieldName := (attribute as DJValueAttribute).Name.Trim;
       end
       else if attribute is DJNonNilableAttribute then
@@ -851,7 +851,7 @@ begin
     // check if nillable is allowed
     if context.settings.IgnoreNonNillable then
     begin
-      nillable := true;
+      nillable := True;
     end;
 
     if not found then
@@ -979,7 +979,7 @@ begin
   end
   else if value.Kind = TTypeKind.tkRecord then
   begin
-    Result := SerObject(value, context, true);
+    Result := SerObject(value, context, True);
   end
   else
   begin
@@ -999,7 +999,7 @@ begin
     begin
       if method.GetParameters[0].Name.ToLower = 'acapacity' then
       begin
-        Result := true;
+        Result := True;
         SetLength(params, 1);
         params[0] := TValue.From(0);
         exit;
@@ -1056,7 +1056,7 @@ begin
     begin
       if attribute is DJConstructorAttribute then
       begin
-        isSelectedConstructor := true;
+        isSelectedConstructor := True;
         break;
       end;
     end;
@@ -1565,58 +1565,58 @@ begin
   begin
     if tmp.Name.ToLower = 'tdatetime' then
     begin
-      Result := true;
+      Result := True;
       DerTDateTime(value, dataType, objOut, context);
       exit;
     end;
 
     if tmp.Name.ToLower = 'tdate' then
     begin
-      Result := true;
+      Result := True;
       DerTDate(value, dataType, objOut, context);
       exit;
     end;
 
     if tmp.Name.ToLower = 'ttime' then
     begin
-      Result := true;
+      Result := True;
       DerTTime(value, dataType, objOut, context);
       exit;
     end;
 
     if tmp.Name.ToLower = 'tjsonvalue' then
     begin
-      Result := true;
+      Result := True;
       DerTJSONValue(value, dataType, objOut, context);
       exit;
     end;
 
     if context.settings.TreatStringDictionaryAsObject and
-      (tmp.Name.ToLower.StartsWith('tdictionary<system.string,', true) or
-      tmp.Name.ToLower.StartsWith('tdictionary<string,', true)) then
+      (tmp.Name.ToLower.StartsWith('tdictionary<system.string,', True) or
+      tmp.Name.ToLower.StartsWith('tdictionary<string,', True)) then
     begin
-      Result := true;
+      Result := True;
       DerTDictionaryStringKey(value, dataType, objOut, context);
       exit;
     end;
 
-    if tmp.Name.ToLower.StartsWith('tdictionary<', true) then
+    if tmp.Name.ToLower.StartsWith('tdictionary<', True) then
     begin
-      Result := true;
+      Result := True;
       DerTDictionary(value, dataType, objOut, context);
       exit;
     end;
 
-    if tmp.Name.ToLower.StartsWith('tpair<', true) then
+    if tmp.Name.ToLower.StartsWith('tpair<', True) then
     begin
-      Result := true;
+      Result := True;
       DerTPair(value, dataType, objOut, context);
       exit;
     end;
 
-    if tmp.Name.ToLower.StartsWith('tenumerable<', true) then
+    if tmp.Name.ToLower.StartsWith('tenumerable<', True) then
     begin
-      Result := true;
+      Result := True;
       DerTEnumerable(value, dataType, objOut, context);
       exit;
     end;
@@ -1680,7 +1680,7 @@ begin
   begin
     if attribute is DJSerializableAttribute then
     begin
-      found := true;
+      found := True;
     end
     else if attribute is DJNoUnusedJSONFieldsAttribute then
     begin
@@ -1707,7 +1707,7 @@ begin
   begin
     // define the standard properties for a field
     found := False;
-    nillable := true;
+    nillable := True;
     required := context.settings.RequiredByDefault;
     defaultValue := nil;
     nilIsDefault := False;
@@ -1719,7 +1719,7 @@ begin
       if attribute is DJValueAttribute then
       begin
         // found the value attribute (this needs to be serialized)
-        found := true;
+        found := True;
         jsonFieldName := (attribute as DJValueAttribute).Name.Trim;
       end
       else if attribute is DJNonNilableAttribute then
@@ -1737,7 +1737,7 @@ begin
       end
       else if attribute is DJDefaultOnNilAttribute then
       begin
-        nilIsDefault := true;
+        nilIsDefault := True;
       end
       else if attribute is IDJConverterInterface then
       begin
@@ -1748,7 +1748,7 @@ begin
     // check if nillable is allowed
     if context.settings.IgnoreNonNillable then
     begin
-      nillable := true;
+      nillable := True;
     end;
 
     if not found then
@@ -2025,7 +2025,7 @@ begin
       raise EDJError.Create(typeMismatch, context);
     end;
 
-    Result := DerObject(value as TJSONObject, dataType, context, true);
+    Result := DerObject(value as TJSONObject, dataType, context, True);
 
   end
   else
@@ -2218,7 +2218,7 @@ begin
     freed := heapAllocatedObjects[obj];
     if not freed then
     begin
-      heapAllocatedObjects[obj] := true;
+      heapAllocatedObjects[obj] := True;
       obj.Free;
     end;
   end;
@@ -2263,7 +2263,7 @@ begin
     begin
       if attribute is DJValueAttribute then
       begin
-        found := true;
+        found := True;
         break;
       end;
     end;
@@ -2337,19 +2337,19 @@ begin
   begin
     exit;
   end;
-  self.objectTracker.AddOrSetValue(obj, true);
+  self.objectTracker.AddOrSetValue(obj, True);
 end;
 
 { TDJSettings }
 
 constructor TDJSettings.Default;
 begin
-  RequireSerializableAttributeForNonRTLClasses := true;
-  DateTimeReturnUTC := true;
+  RequireSerializableAttributeForNonRTLClasses := True;
+  DateTimeReturnUTC := True;
   IgnoreNonNillable := False;
-  RequiredByDefault := true;
-  TreatStringDictionaryAsObject := true;
-  AllowUnusedJSONFields := true;
+  RequiredByDefault := True;
+  TreatStringDictionaryAsObject := True;
+  AllowUnusedJSONFields := True;
 end;
 
 { DJDefaultValueAttribute }
