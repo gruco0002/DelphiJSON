@@ -106,8 +106,12 @@ type
     /// error after an internal cleanup to avoid memory leaks.
     /// Note: always specify the correct type for [T]. Wrong types could lead to
     /// undefined behaviour.
+    /// [keepRTTIContext] lets DelphiJson keep the created RTTI Context alive in
+    /// order to improve the performance and prevent possible multi-threading
+    /// issues.
     /// </summary>
-    class function Deserialize(data: String; settings: TDJSettings = nil): T;
+    class function Deserialize(data: String; settings: TDJSettings = nil;
+      keepRTTIContext: Boolean = True): T;
 
     /// <summary>
     /// Deserializes the JSON value [data] into the specified object type.
@@ -118,9 +122,12 @@ type
     /// error after an internal cleanup to avoid memory leaks.
     /// Note: always specify the correct type for [T]. Wrong types could lead to
     /// undefined behaviour.
+    /// [keepRTTIContext] lets DelphiJson keep the created RTTI Context alive in
+    /// order to improve the performance and prevent possible multi-threading
+    /// issues.
     /// </summary>
-    class function DeserializeJ(data: TJSONValue;
-      settings: TDJSettings = nil): T;
+    class function DeserializeJ(data: TJSONValue; settings: TDJSettings = nil;
+      keepRTTIContext: Boolean = True): T;
 
     /// <summary>
     /// Serializes the given [data] into a JSON string.
@@ -131,8 +138,12 @@ type
     /// error after an internal cleanup to avoid memory leaks.
     /// Note: always specify the correct type for [T]. Wrong types could lead to
     /// undefined behaviour.
+    /// [keepRTTIContext] lets DelphiJson keep the created RTTI Context alive in
+    /// order to improve the performance and prevent possible multi-threading
+    /// issues.
     /// </summary>
-    class function Serialize(data: T; settings: TDJSettings = nil): string;
+    class function Serialize(data: T; settings: TDJSettings = nil;
+      keepRTTIContext: Boolean = True): string;
 
     /// <summary>
     /// Serializes the given [data] into a JSON value.
@@ -145,8 +156,12 @@ type
     /// to the caller of the function after it returns!
     /// Note: always specify the correct type for [T]. Wrong types could lead to
     /// undefined behaviour.
+    /// [keepRTTIContext] lets DelphiJson keep the created RTTI Context alive in
+    /// order to improve the performance and prevent possible multi-threading
+    /// issues.
     /// </summary>
-    class function SerializeJ(data: T; settings: TDJSettings = nil): TJSONValue;
+    class function SerializeJ(data: T; settings: TDJSettings = nil;
+      keepRTTIContext: Boolean = True): TJSONValue;
 
   private
     constructor Create;
@@ -397,6 +412,8 @@ type
   public
     RTTI: TRttiContext;
     settings: TDJSettings;
+
+    keepRTTIContext: Boolean;
 
     constructor Create;
     destructor Destroy; override;
@@ -2028,15 +2045,15 @@ begin
   raise EDJError.Create('Do not create instances of this object!', tmp);
 end;
 
-class function DelphiJSON<T>.Deserialize(data: String;
-  settings: TDJSettings): T;
+class function DelphiJSON<T>.Deserialize(data: String; settings: TDJSettings;
+  keepRTTIContext: Boolean): T;
 var
   val: TJSONValue;
 begin
   val := nil;
   try
-    val := TJSONObject.ParseJSONValue(data, true, true);
-    Result := DeserializeJ(val, settings);
+    val := TJSONObject.ParseJSONValue(data, True, True);
+    Result := DeserializeJ(val, settings, keepRTTIContext);
   except
     on E: EDJError do
     begin
@@ -2048,7 +2065,7 @@ begin
 end;
 
 class function DelphiJSON<T>.DeserializeJ(data: TJSONValue;
-  settings: TDJSettings): T;
+  settings: TDJSettings; keepRTTIContext: Boolean): T;
 var
   context: TDerContext;
   rttiType: TRttiType;
@@ -2064,6 +2081,7 @@ begin
 
   context := TDerContext.Create;
   context.settings := settings;
+  context.keepRTTIContext := keepRTTIContext;
 
   try
     rttiType := context.RTTI.GetType(System.TypeInfo(T));
@@ -2083,13 +2101,14 @@ begin
   Result := res.AsType<T>();
 end;
 
-class function DelphiJSON<T>.Serialize(data: T; settings: TDJSettings): string;
+class function DelphiJSON<T>.Serialize(data: T; settings: TDJSettings;
+  keepRTTIContext: Boolean): string;
 var
   JsonValue: TJSONValue;
 begin
   JsonValue := nil;
   try
-    JsonValue := SerializeJ(data, settings);
+    JsonValue := SerializeJ(data, settings, keepRTTIContext);
     Result := JsonValue.ToJSON;
   except
     on E: EDJError do
@@ -2101,8 +2120,8 @@ begin
   JsonValue.Free;
 end;
 
-class function DelphiJSON<T>.SerializeJ(data: T; settings: TDJSettings)
-  : TJSONValue;
+class function DelphiJSON<T>.SerializeJ(data: T; settings: TDJSettings;
+  keepRTTIContext: Boolean): TJSONValue;
 var
   valueObject: TValue;
   context: TSerContext;
@@ -2117,6 +2136,7 @@ begin
 
   context := TSerContext.Create;
   context.settings := settings;
+  context.keepRTTIContext := keepRTTIContext;
 
   try
     valueObject := TValue.From<T>(data);
@@ -2151,6 +2171,7 @@ end;
 
 constructor TSerContext.Create;
 begin
+  self.keepRTTIContext := True;
   self.path := TStack<string>.Create;
   self.RTTI := TRttiContext.Create;
   self.heapAllocatedObjects := TDictionary<TObject, Boolean>.Create;
@@ -2161,7 +2182,14 @@ destructor TSerContext.Destroy;
 begin
   self.path.Free;
   self.path := nil;
-  self.RTTI.Free;
+  if self.keepRTTIContext then
+  begin
+    self.RTTI.KeepContext;
+  end
+  else
+  begin
+    self.RTTI.Free;
+  end;
   self.heapAllocatedObjects.Clear;
   self.heapAllocatedObjects.Free;
   self.heapAllocatedObjects := nil;
