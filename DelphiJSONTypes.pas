@@ -12,7 +12,8 @@ unit DelphiJSONTypes;
 interface
 
 uses
-  System.Generics.Collections, System.SysUtils, System.JSON;
+  System.Generics.Collections, System.SysUtils, System.JSON,
+  System.JSON.Readers, System.JSON.Writers, System.JSON.Builders;
 
 type
   /// <summary>
@@ -438,6 +439,69 @@ type
     class function GetTypeOfValue(value: TJSONValue)
       : TDJJsonStream.TDJJsonStreamTypes;
 
+  end;
+
+  /// <summary>
+  /// Implementation of the TDJJsonStream for TJSONReader / TJSONWriter based
+  /// input data.
+  /// </summary>
+  TDJTJsonRWStream = class(TDJJsonStream)
+  public
+    procedure ReadNext; override;
+    function ReadIsDone: Boolean; override;
+    function ReadGetType: TDJJsonStream.TDJJsonStreamTypes; override;
+    procedure ReadStepInto; override;
+    procedure ReadStepOut; override;
+    function ReadIsRoot: Boolean; override;
+    function ReadPropertyName: String; override;
+    function ReadValueIsNull: Boolean; override;
+    function ReadValueBoolean: Boolean; override;
+    function ReadValueString: string; override;
+    function ReadValueInteger: Int64; override;
+    function ReadValueFloat: double; override;
+
+  public
+    procedure WriteSetNextPropertyName(const propertyName: string); override;
+    procedure WriteBeginObject(const propertyName: string = ''); override;
+    procedure WriteEndObject; override;
+    procedure WriteBeginArray(const propertyName: string = ''); override;
+    procedure WriteEndArray; override;
+    procedure WriteValueNull(const propertyName: string = ''); override;
+    procedure WriteValueBoolean(value: Boolean;
+      const propertyName: string = ''); override;
+    procedure WriteValueString(const value: string;
+      const propertyName: string = ''); override;
+    procedure WriteValueInteger(const value: Int64;
+      const propertyName: string = ''); override;
+    procedure WriteValueFloat(const value: double;
+      const propertyName: string = ''); override;
+
+  public
+    constructor CreateReader(reader: TJSONReader;
+      readerOwnedByThisObject: Boolean = false);
+    constructor CreateWriter(writer: TJSONWriter;
+      writerOwnedByThisObject: Boolean = false);
+
+    destructor Destroy; override;
+
+  private
+    isInReadMode: Boolean;
+
+    // read related data structures
+    readReader: TJSONReader;
+    readReaderOwnedByThisObject: Boolean;
+    readIterator: TJSONIterator;
+    readLastPropertyName: string;
+    readIsDoneFlag: Boolean;
+
+    // write related data structures
+    writeWriter: TJSONWriter;
+    writeWriterOwnedByThisObject: Boolean;
+    writeNextPropertyName: String;
+
+  private
+    function WriteGetFinalPropertyName(propertyName: string): string;
+    procedure WriteWriteFinalPropertyName(propertyName: string);
   end;
 
 implementation
@@ -1210,6 +1274,308 @@ begin
       ('Stream is read only but a write method was called!');
   end;
   self.WriteJsonValue(TJSONString.Create(value), propertyName);
+end;
+
+{ TDJTJsonRWStream }
+
+constructor TDJTJsonRWStream.CreateReader(reader: TJSONReader;
+  readerOwnedByThisObject: Boolean);
+begin
+  self.isInReadMode := true;
+  self.readReader := reader;
+  self.readReaderOwnedByThisObject := readerOwnedByThisObject;
+  self.readIterator := TJSONIterator.Create(self.readReader);
+  self.readIsDoneFlag := self.readIterator.Next;
+  self.readLastPropertyName := '';
+end;
+
+constructor TDJTJsonRWStream.CreateWriter(writer: TJSONWriter;
+  writerOwnedByThisObject: Boolean);
+begin
+  self.isInReadMode := false;
+  self.writeWriter := writer;
+  self.writeWriterOwnedByThisObject := writerOwnedByThisObject;
+  self.writeNextPropertyName := '';
+end;
+
+destructor TDJTJsonRWStream.Destroy;
+begin
+  if self.isInReadMode then
+  begin
+    if self.readReaderOwnedByThisObject then
+    begin
+      FreeAndNil(self.readReader);
+    end
+    else
+    begin
+      self.readReader := nil;
+    end;
+    FreeAndNil(self.readIterator);
+  end
+  else
+  begin
+    if self.writeWriterOwnedByThisObject then
+    begin
+      FreeAndNil(self.writeWriter);
+    end
+    else
+    begin
+      self.writeWriter := nil;
+    end;
+  end;
+  inherited;
+end;
+
+function TDJTJsonRWStream.ReadGetType: TDJJsonStream.TDJJsonStreamTypes;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+  // SEE: https://docwiki.embarcadero.com/Libraries/Sydney/de/System.JSON.Builders.TJSONIterator
+
+end;
+
+function TDJTJsonRWStream.ReadIsDone: Boolean;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+  Result := self.readIsDoneFlag;
+end;
+
+function TDJTJsonRWStream.ReadIsRoot: Boolean;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+  Result := self.readIterator.Depth = 0;
+end;
+
+procedure TDJTJsonRWStream.ReadNext;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+  self.readIsDoneFlag := self.readIterator.Next;
+end;
+
+function TDJTJsonRWStream.ReadPropertyName: String;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+  if self.readLastPropertyName = '' then
+  begin
+    raise Exception.Create('Cannot read property name in this context!');
+  end;
+Result :=  self.readLastPropertyName;
+end;
+
+procedure TDJTJsonRWStream.ReadStepInto;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+  self.readIterator.Recurse;
+end;
+
+procedure TDJTJsonRWStream.ReadStepOut;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+  self.readIterator.Return;
+end;
+
+function TDJTJsonRWStream.ReadValueBoolean: Boolean;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+end;
+
+function TDJTJsonRWStream.ReadValueFloat: double;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+end;
+
+function TDJTJsonRWStream.ReadValueInteger: Int64;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+end;
+
+function TDJTJsonRWStream.ReadValueIsNull: Boolean;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+end;
+
+function TDJTJsonRWStream.ReadValueString: string;
+begin
+  if not self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is write only but a read method was called!');
+  end;
+end;
+
+procedure TDJTJsonRWStream.WriteBeginArray(const propertyName: string);
+begin
+  if self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is read only but a write method was called!');
+  end;
+  self.WriteWriteFinalPropertyName(propertyName);
+  self.writeWriter.WriteStartArray;
+end;
+
+procedure TDJTJsonRWStream.WriteBeginObject(const propertyName: string);
+begin
+  if self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is read only but a write method was called!');
+  end;
+  self.WriteWriteFinalPropertyName(propertyName);
+  self.writeWriter.WriteStartObject;
+end;
+
+procedure TDJTJsonRWStream.WriteEndArray;
+begin
+  if self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is read only but a write method was called!');
+  end;
+  self.writeWriter.WriteEndArray;
+end;
+
+procedure TDJTJsonRWStream.WriteEndObject;
+begin
+  if self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is read only but a write method was called!');
+  end;
+  self.writeWriter.WriteEndObject;
+end;
+
+function TDJTJsonRWStream.WriteGetFinalPropertyName(propertyName
+  : string): string;
+begin
+  Result := self.writeNextPropertyName;
+  self.writeNextPropertyName := '';
+  if propertyName <> '' then
+  begin
+    Result := propertyName;
+  end;
+end;
+
+procedure TDJTJsonRWStream.WriteSetNextPropertyName(const propertyName: string);
+begin
+  if self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is read only but a write method was called!');
+  end;
+  self.writeNextPropertyName := propertyName;
+end;
+
+procedure TDJTJsonRWStream.WriteValueBoolean(value: Boolean;
+  const propertyName: string);
+begin
+  if self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is read only but a write method was called!');
+  end;
+  self.WriteWriteFinalPropertyName(propertyName);
+  self.writeWriter.WriteValue(value);
+end;
+
+procedure TDJTJsonRWStream.WriteValueFloat(const value: double;
+  const propertyName: string);
+begin
+  if self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is read only but a write method was called!');
+  end;
+  self.WriteWriteFinalPropertyName(propertyName);
+  self.writeWriter.WriteValue(value);
+end;
+
+procedure TDJTJsonRWStream.WriteValueInteger(const value: Int64;
+  const propertyName: string);
+begin
+  if self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is read only but a write method was called!');
+  end;
+  self.WriteWriteFinalPropertyName(propertyName);
+  self.writeWriter.WriteValue(value);
+end;
+
+procedure TDJTJsonRWStream.WriteValueNull(const propertyName: string);
+begin
+  if self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is read only but a write method was called!');
+  end;
+  self.WriteWriteFinalPropertyName(propertyName);
+  self.writeWriter.WriteNull;
+end;
+
+procedure TDJTJsonRWStream.WriteValueString(const value, propertyName: string);
+begin
+  if self.isInReadMode then
+  begin
+    raise exception.Create
+      ('Stream is read only but a write method was called!');
+  end;
+  self.WriteWriteFinalPropertyName(propertyName);
+  self.writeWriter.WriteValue(value);
+end;
+
+procedure TDJTJsonRWStream.WriteWriteFinalPropertyName(propertyName: string);
+var
+  finalPropertyName: string;
+begin
+  finalPropertyName := self.WriteGetFinalPropertyName(propertyName);
+  if finalPropertyName <> '' then
+  begin
+    self.writeWriter.WritePropertyName(finalPropertyName);
+  end;
 end;
 
 end.
