@@ -106,12 +106,8 @@ type
     /// error after an internal cleanup to avoid memory leaks.
     /// Note: always specify the correct type for [T]. Wrong types could lead to
     /// undefined behaviour.
-    /// [keepRTTIContext] lets DelphiJson keep the created RTTI Context alive in
-    /// order to improve the performance and prevent possible multi-threading
-    /// issues.
     /// </summary>
-    class function Deserialize(data: String; settings: TDJSettings = nil;
-      keepRTTIContext: Boolean = True): T;
+    class function Deserialize(data: String; settings: TDJSettings = nil): T;
 
     /// <summary>
     /// Deserializes the JSON value [data] into the specified object type.
@@ -122,12 +118,8 @@ type
     /// error after an internal cleanup to avoid memory leaks.
     /// Note: always specify the correct type for [T]. Wrong types could lead to
     /// undefined behaviour.
-    /// [keepRTTIContext] lets DelphiJson keep the created RTTI Context alive in
-    /// order to improve the performance and prevent possible multi-threading
-    /// issues.
     /// </summary>
-    class function DeserializeJ(data: TJSONValue; settings: TDJSettings = nil;
-      keepRTTIContext: Boolean = True): T;
+    class function DeserializeJ(data: TJSONValue; settings: TDJSettings = nil): T;
 
     /// <summary>
     /// Serializes the given [data] into a JSON string.
@@ -138,12 +130,8 @@ type
     /// error after an internal cleanup to avoid memory leaks.
     /// Note: always specify the correct type for [T]. Wrong types could lead to
     /// undefined behaviour.
-    /// [keepRTTIContext] lets DelphiJson keep the created RTTI Context alive in
-    /// order to improve the performance and prevent possible multi-threading
-    /// issues.
     /// </summary>
-    class function Serialize(data: T; settings: TDJSettings = nil;
-      keepRTTIContext: Boolean = True): string;
+    class function Serialize(data: T; settings: TDJSettings = nil): string;
 
     /// <summary>
     /// Serializes the given [data] into a JSON value.
@@ -156,12 +144,8 @@ type
     /// to the caller of the function after it returns!
     /// Note: always specify the correct type for [T]. Wrong types could lead to
     /// undefined behaviour.
-    /// [keepRTTIContext] lets DelphiJson keep the created RTTI Context alive in
-    /// order to improve the performance and prevent possible multi-threading
-    /// issues.
     /// </summary>
-    class function SerializeJ(data: T; settings: TDJSettings = nil;
-      keepRTTIContext: Boolean = True): TJSONValue;
+    class function SerializeJ(data: T; settings: TDJSettings = nil): TJSONValue;
 
   private
     constructor Create;
@@ -413,8 +397,6 @@ type
     RTTI: TRttiContext;
     settings: TDJSettings;
 
-    keepRTTIContext: Boolean;
-
     constructor Create;
     destructor Destroy; override;
 
@@ -444,6 +426,9 @@ implementation
 
 uses
   System.TypInfo, System.DateUtils;
+
+var
+  unitRttiContextInstance: TRttiContext;
 
 function PathToString(path: TEnumerable<String>): String;
 var
@@ -2035,7 +2020,7 @@ begin
   end;
 end;
 
-{ DelphiJSON<T> }
+{DelphiJSON<T>}
 
 constructor DelphiJSON<T>.Create;
 var
@@ -2045,15 +2030,14 @@ begin
   raise EDJError.Create('Do not create instances of this object!', tmp);
 end;
 
-class function DelphiJSON<T>.Deserialize(data: String; settings: TDJSettings;
-  keepRTTIContext: Boolean): T;
+class function DelphiJSON<T>.Deserialize(data: String; settings: TDJSettings): T;
 var
   val: TJSONValue;
 begin
   val := nil;
   try
     val := TJSONObject.ParseJSONValue(data, True, True);
-    Result := DeserializeJ(val, settings, keepRTTIContext);
+    Result := DeserializeJ(val, settings);
   except
     on E: EDJError do
     begin
@@ -2064,8 +2048,7 @@ begin
   val.Free;
 end;
 
-class function DelphiJSON<T>.DeserializeJ(data: TJSONValue;
-  settings: TDJSettings; keepRTTIContext: Boolean): T;
+class function DelphiJSON<T>.DeserializeJ(data: TJSONValue; settings: TDJSettings): T;
 var
   context: TDerContext;
   rttiType: TRttiType;
@@ -2081,7 +2064,6 @@ begin
 
   context := TDerContext.Create;
   context.settings := settings;
-  context.keepRTTIContext := keepRTTIContext;
 
   try
     rttiType := context.RTTI.GetType(System.TypeInfo(T));
@@ -2101,14 +2083,13 @@ begin
   Result := res.AsType<T>();
 end;
 
-class function DelphiJSON<T>.Serialize(data: T; settings: TDJSettings;
-  keepRTTIContext: Boolean): string;
+class function DelphiJSON<T>.Serialize(data: T; settings: TDJSettings): string;
 var
   JsonValue: TJSONValue;
 begin
   JsonValue := nil;
   try
-    JsonValue := SerializeJ(data, settings, keepRTTIContext);
+    JsonValue := SerializeJ(data, settings);
     Result := JsonValue.ToJSON;
   except
     on E: EDJError do
@@ -2120,8 +2101,7 @@ begin
   JsonValue.Free;
 end;
 
-class function DelphiJSON<T>.SerializeJ(data: T; settings: TDJSettings;
-  keepRTTIContext: Boolean): TJSONValue;
+class function DelphiJSON<T>.SerializeJ(data: T; settings: TDJSettings): TJSONValue;
 var
   valueObject: TValue;
   context: TSerContext;
@@ -2136,7 +2116,6 @@ begin
 
   context := TSerContext.Create;
   context.settings := settings;
-  context.keepRTTIContext := keepRTTIContext;
 
   try
     valueObject := TValue.From<T>(data);
@@ -2155,14 +2134,14 @@ begin
   createdSettings.Free;
 end;
 
-{ DJValueAttribute }
+{DJValueAttribute}
 
 constructor DJValueAttribute.Create(const Name: string);
 begin
   self.Name := Name;
 end;
 
-{ TSerContext }
+{TSerContext}
 
 procedure TSerContext.AddHeapObject(obj: TObject);
 begin
@@ -2171,7 +2150,6 @@ end;
 
 constructor TSerContext.Create;
 begin
-  self.keepRTTIContext := True;
   self.path := TStack<string>.Create;
   self.RTTI := TRttiContext.Create;
   self.heapAllocatedObjects := TDictionary<TObject, Boolean>.Create;
@@ -2182,14 +2160,7 @@ destructor TSerContext.Destroy;
 begin
   self.path.Free;
   self.path := nil;
-  if self.keepRTTIContext then
-  begin
-    self.RTTI.KeepContext;
-  end
-  else
-  begin
-    self.RTTI.Free;
-  end;
+  self.RTTI.Free;
   self.heapAllocatedObjects.Clear;
   self.heapAllocatedObjects.Free;
   self.heapAllocatedObjects := nil;
@@ -2340,7 +2311,7 @@ begin
   self.objectTracker.AddOrSetValue(obj, True);
 end;
 
-{ TDJSettings }
+{TDJSettings}
 
 constructor TDJSettings.Default;
 begin
@@ -2352,7 +2323,7 @@ begin
   AllowUnusedJSONFields := True;
 end;
 
-{ DJDefaultValueAttribute }
+{DJDefaultValueAttribute}
 
 constructor DJDefaultValueAttribute.Create(const value: single);
 begin
@@ -2389,21 +2360,21 @@ begin
   self.value := TValue.From(value);
 end;
 
-{ DJDefaultValueCreatorAttribute<T> }
+{DJDefaultValueCreatorAttribute<T>}
 
 function DJDefaultValueCreatorAttribute<T>.GetValue: TValue;
 begin
   Result := TValue.From<T>(Generator());
 end;
 
-{ DJRequiredAttribute }
+{DJRequiredAttribute}
 
 constructor DJRequiredAttribute.Create(const required: Boolean);
 begin
   self.required := required;
 end;
 
-{ EDJError }
+{EDJError}
 
 function EDJError.Clone: EDJError;
 begin
@@ -2445,7 +2416,7 @@ begin
   Result := PathToString(path);
 end;
 
-{ DJConverterAttribute<T> }
+{DJConverterAttribute<T>}
 
 function DJConverterAttribute<T>.FromJSONinternal(value: TJSONValue): TValue;
 begin
@@ -2457,53 +2428,76 @@ begin
   Result := ToJSON(value.AsType<T>());
 end;
 
-{ EDJRequiredError }
+{EDJRequiredError}
 
 function EDJRequiredError.Clone: EDJError;
 begin
   Result := EDJRequiredError.Create(self.errorMessage, self.path);
 end;
 
-{ EDJNilError }
+{EDJNilError}
 
 function EDJNilError.Clone: EDJError;
 begin
   Result := EDJNilError.Create(self.errorMessage, self.path);
 end;
 
-{ EDJWrongArraySizeError }
+{EDJWrongArraySizeError}
 
 function EDJWrongArraySizeError.Clone: EDJError;
 begin
   Result := EDJWrongArraySizeError.Create(self.errorMessage, self.path);
 end;
 
-{ EDJCycleError }
+{EDJCycleError}
 
 function EDJCycleError.Clone: EDJError;
 begin
   Result := EDJCycleError.Create(self.errorMessage, self.path);
 end;
 
-{ EDJFormatError }
+{EDJFormatError}
 
 function EDJFormatError.Clone: EDJError;
 begin
   Result := EDJFormatError.Create(self.errorMessage, self.path);
 end;
 
-{ DJNoUnusedJSONFieldsAttribute }
+{DJNoUnusedJSONFieldsAttribute}
 
 constructor DJNoUnusedJSONFieldsAttribute.Create(const noUnusedFields: Boolean);
 begin
   self.noUnusedFields := noUnusedFields;
 end;
 
-{ EDJUnusedFieldsError }
+{EDJUnusedFieldsError}
 
 function EDJUnusedFieldsError.Clone: EDJError;
 begin
   Result := EDJUnusedFieldsError.Create(self.errorMessage, self.path);
+end;
+
+initialization
+
+begin
+  // create the unit wide used rtti context
+
+  // This is done to provide thread safety!
+  // The context only provides a reference to the global reference counted rtti context
+  // singleton. The singleton gets freed if there are no references left and is recreated
+  // if not existing. The reference / free / recreate part seems to not be thread safe
+  // and caused access violations.
+  // If we always keep at least one reference to the context object like here, this issue
+  // is no longer a problem.
+
+  unitRttiContextInstance := TRttiContext.Create;
+end;
+
+finalization
+
+begin
+  // free the unit wide used rtti context
+  unitRttiContextInstance.Free;
 end;
 
 end.
