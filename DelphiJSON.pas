@@ -301,6 +301,14 @@ type
     constructor Create(const noUnusedFields: Boolean = True);
   end;
 
+  /// <summary>
+  /// If applied to a field the [DJNullIfEmptyAttribute] is active during
+  /// serialization and causes an empty [string] to be represented by the
+  /// JSON null literal instead of an empty JSON string literal.  ///
+  /// </summary>
+  DJNullIfEmptyStringAttribute = class(TCustomAttribute)
+  end;
+
   TSerContext = class;
 
   /// <summary>
@@ -418,7 +426,7 @@ type
 
   TDerContext = TSerContext;
 
-function SerializeInternal(value: TValue; context: TSerContext): TJSONValue;
+function SerializeInternal(value: TValue; context: TSerContext; nullIfEmptyString: Boolean = false): TJSONValue;
 function DeserializeInternal(value: TJSONValue; dataType: TRttiType;
   context: TDerContext): TValue;
 
@@ -485,8 +493,18 @@ begin
   context.AddHeapObject(Result);
 end;
 
-function SerString(value: TValue; context: TSerContext): TJSONString;
+function SerString(value: TValue; context: TSerContext; nullIfEmptyString: Boolean): TJSONValue;
 begin
+  if nullIfEmptyString then
+  begin
+    if value.AsString.IsEmpty then
+    begin
+      Result := TJSONNull.Create;
+      context.AddHeapObject(Result);
+      exit;
+    end;
+  end;
+
   Result := TJSONString.Create(value.AsString);
   context.AddHeapObject(Result);
 end;
@@ -771,6 +789,7 @@ var
 
   nillable: Boolean;
   converter: IDJConverterInterface;
+  nullIfEmptyString: Boolean;
 begin
 
   dataType := context.RTTI.GetType(value.TypeInfo);
@@ -812,6 +831,7 @@ begin
     found := False;
     nillable := True;
     converter := nil;
+    nullIfEmptyString := false;
 
     // check for the attributes
     for attribute in field.GetAttributes() do
@@ -830,6 +850,10 @@ begin
       else if attribute is IDJConverterInterface then
       begin
         converter := attribute as IDJConverterInterface;
+      end
+      else if attribute is DJNullIfEmptyStringAttribute then
+      begin
+        nullIfEmptyString := True;
       end;
     end;
 
@@ -889,7 +913,7 @@ begin
       else
       begin
         // use the default serialization
-        serializedField := SerializeInternal(fieldValue, context);
+        serializedField := SerializeInternal(fieldValue, context, nullIfEmptyString);
       end;
     end;
     context.PopPath;
@@ -902,7 +926,7 @@ begin
 
 end;
 
-function SerializeInternal(value: TValue; context: TSerContext): TJSONValue;
+function SerializeInternal(value: TValue; context: TSerContext; nullIfEmptyString: Boolean = false): TJSONValue;
 var
   dataType: TRttiType;
 begin
@@ -946,7 +970,7 @@ begin
   end
   else if value.IsType<string>(False) then
   begin
-    Result := SerString(value, context);
+    Result := SerString(value, context, nullIfEmptyString);
   end
   else if value.IsEmpty then
   begin
