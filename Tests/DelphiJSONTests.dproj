@@ -110,6 +110,7 @@
         <DCCReference Include="RecordArrayTests.pas"/>
         <DCCReference Include="ToAndFromJsonAttributesTests.pas"/>
         <DCCReference Include="NullIfEmptyStringTests.pas"/>
+        <DCCReference Include="CustomSettingsTests.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

@@ -283,9 +283,19 @@ type
     AllowUnusedJSONFields: Boolean;
 
     /// <summary>
+    /// A map of custom properties that can be passed into the (de)serialization
+    /// process.
+    /// [CustomProperties] is created, owned and freed by an instance of
+    /// [TDJSettings].
+    /// </summary>
+    CustomProperties: TDictionary<String, String>;
+
+    /// <summary>
     /// Creates the default settings for (de)serialization.
     /// </summary>
     constructor Default;
+
+    destructor Destroy; override;
 
   end;
 
@@ -649,6 +659,14 @@ begin
   RequiredByDefault := true;
   TreatStringDictionaryAsObject := true;
   AllowUnusedJSONFields := true;
+
+  self.CustomProperties := TDictionary<String, String>.Create;
+end;
+
+destructor TDJSettings.Destroy;
+begin
+  FreeAndNil(self.CustomProperties);
+  inherited;
 end;
 
 {EDJError}
