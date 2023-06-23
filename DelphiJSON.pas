@@ -132,6 +132,9 @@ implementation
 uses
   System.TypInfo, System.DateUtils, System.Variants;
 
+var
+  unitRttiContextInstance: TRttiContext;
+
 procedure SerArray(value: TValue; context: TSerContext);
 var
   size: integer;
@@ -2357,6 +2360,29 @@ begin
     exit;
   end;
   self.objectTracker.AddOrSetValue(obj, true);
+end;
+
+initialization
+
+begin
+  // create the unit wide used rtti context
+
+  // This is done to provide thread safety!
+  // The context only provides a reference to the global reference counted rtti context
+  // singleton. The singleton gets freed if there are no references left and is recreated
+  // if not existing. The reference / free / recreate part seems to not be thread safe
+  // and caused access violations.
+  // If we always keep at least one reference to the context object like here, this issue
+  // is no longer a problem.
+
+  unitRttiContextInstance := TRttiContext.Create;
+end;
+
+finalization
+
+begin
+  // free the unit wide used rtti context
+  unitRttiContextInstance.Free;
 end;
 
 end.
