@@ -124,7 +124,7 @@ type
 
   TDerContext = TSerContext;
 
-procedure SerializeInternal(value: TValue; context: TSerContext);
+procedure SerializeInternal(value: TValue; context: TSerContext; nullIfEmptyString: Boolean = False);
 function DeserializeInternal(dataType: TRttiType; context: TDerContext): TValue;
 
 implementation
@@ -167,8 +167,16 @@ begin
   context.stream.WriteValueInteger(value.AsInteger);
 end;
 
-procedure SerString(value: TValue; context: TSerContext);
+procedure SerString(value: TValue; context: TSerContext; nullIfEmptyString: Boolean);
 begin
+  if nullIfEmptyString then
+  begin
+    if value.AsString.IsEmpty then
+    begin
+      context.stream.WriteValueNull;
+      exit;
+    end;
+  end;
   context.stream.WriteValueString(value.AsString);
 end;
 
@@ -493,6 +501,8 @@ var
 
   nillable: Boolean;
   converter: IDJConverterInterface;
+
+  nullIfEmptyString: Boolean;
 begin
 
   dataType := context.RTTI.GetType(value.TypeInfo);
@@ -547,6 +557,7 @@ begin
     found := False;
     nillable := true;
     converter := nil;
+    nullIfEmptyString := False;
 
     // check for the attributes
     for attribute in field.GetAttributes() do
@@ -565,6 +576,10 @@ begin
       else if attribute is IDJConverterInterface then
       begin
         converter := attribute as IDJConverterInterface;
+      end
+      else if attribute is DJNullIfEmptyStringAttribute then
+      begin
+        nullIfEmptyString := true;
       end;
     end;
 
@@ -625,7 +640,7 @@ begin
       else
       begin
         // use the default serialization
-        SerializeInternal(fieldValue, context);
+        SerializeInternal(fieldValue, context, nullIfEmptyString);
       end;
     end;
     context.PopPath;
@@ -635,7 +650,7 @@ begin
 
 end;
 
-procedure SerializeInternal(value: TValue; context: TSerContext);
+procedure SerializeInternal(value: TValue; context: TSerContext; nullIfEmptyString: Boolean = False);
 var
   dataType: TRttiType;
 begin
@@ -679,7 +694,7 @@ begin
   end
   else if value.IsType<string>(False) then
   begin
-    SerString(value, context);
+    SerString(value, context, nullIfEmptyString);
   end
   else if value.IsEmpty then
   begin

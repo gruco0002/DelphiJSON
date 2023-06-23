@@ -34,7 +34,8 @@ uses
   UnusedFieldsTests in 'UnusedFieldsTests.pas',
   JSONValueTests in 'JSONValueTests.pas',
   RecordArrayTests in 'RecordArrayTests.pas',
-  ToAndFromJsonAttributesTests in 'ToAndFromJsonAttributesTests.pas';
+  ToAndFromJsonAttributesTests in 'ToAndFromJsonAttributesTests.pas',
+  NullIfEmptyStringTests in 'NullIfEmptyStringTests.pas';
 
 var
   runner: ITestRunner;

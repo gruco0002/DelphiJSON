@@ -191,6 +191,14 @@ type
   DJToJSONFunctionAttribute = class(TCustomAttribute)
   end;
 
+  /// <summary>
+  /// If applied to a field the [DJNullIfEmptyAttribute] is active during
+  /// serialization and causes an empty [string] to be represented by the
+  /// JSON null literal instead of an empty JSON string literal.
+  /// </summary>
+  DJNullIfEmptyStringAttribute = class(TCustomAttribute)
+  end;
+
 implementation
 
 type
