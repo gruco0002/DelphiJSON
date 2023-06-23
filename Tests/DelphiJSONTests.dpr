@@ -4,15 +4,21 @@ program DelphiJSONTests;
 {$APPTYPE CONSOLE}
 {$ENDIF}{$STRONGLINKTYPES ON}
 
+{$WARN UNKNOWN_CUSTOM_ATTRIBUTE ERROR}
+{$WARN DUPLICATE_CTOR_DTOR OFF}
+
 uses
   FastMM4,
   System.SysUtils,
-  {$IFDEF TESTINSIGHT}
+{$IFDEF TESTINSIGHT}
   TestInsight.DUnitX,
-  {$ENDIF }
+{$ENDIF }
   DUnitX.Loggers.Console,
   DUnitX.Loggers.Xml.NUnit,
   DUnitX.TestFramework,
+  DelphiJSON in '..\DelphiJSON.pas',
+  DelphiJSONAttributes in '..\DelphiJSONAttributes.pas',
+  DelphiJSONTypes in '..\DelphiJSONTypes.pas',
   BasicTests in 'BasicTests.pas',
   JSONComparer in 'JSONComparer.pas',
   JSONComparerTests in 'JSONComparerTests.pas',
