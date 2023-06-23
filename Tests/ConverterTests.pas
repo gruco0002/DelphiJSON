@@ -8,8 +8,8 @@ uses
 type
   TUpperConv = class(DJConverterAttribute<String>)
   public
-    procedure ToJSON(value: String; stream: TDJJsonStream); override;
-    function FromJSON(stream: TDJJsonStream): String; override;
+    procedure ToJSON(value: String; stream: TDJJsonStream; settings: TDJSettings); override;
+    function FromJSON(stream: TDJJsonStream; settings: TDJSettings): String; override;
   end;
 
   [DJSerializableAttribute]
@@ -38,9 +38,9 @@ implementation
 uses
   System.SysUtils, System.StrUtils, JSONComparer, DelphiJSON, System.JSON;
 
-{ TUpperConv }
+{TUpperConv}
 
-function TUpperConv.FromJSON(stream: TDJJsonStream): String;
+function TUpperConv.FromJSON(stream: TDJJsonStream; settings: TDJSettings): String;
 begin
   if stream.ReadGetType <> TDJJsonStream.TDJJsonStreamTypes.djstString then
   begin
@@ -49,12 +49,12 @@ begin
   Result := stream.ReadValueString.toUpper;
 end;
 
-procedure TUpperConv.ToJSON(value: String; stream: TDJJsonStream);
+procedure TUpperConv.ToJSON(value: String; stream: TDJJsonStream; settings: TDJSettings);
 begin
   stream.WriteValueString(value.toUpper);
 end;
 
-{ TConverterTests }
+{TConverterTests}
 
 procedure TConverterTests.TestUppercaseConverter1;
 const

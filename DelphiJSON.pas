@@ -456,7 +456,7 @@ begin
 
   // get parameters types and verify their correctness
   parameters := method.GetParameters;
-  if Length(parameters) <> 2 then
+  if Length(parameters) <> 3 then
   begin
     raise EDJError.Create
       ('Invalid amount of parameters for method "ToJSON" on converter!',
@@ -479,8 +479,10 @@ begin
       context.GetPath);
   end;
 
+  // TODO: check type of settings parameter
+
   // invoke the method after everything else seems fine
-  method.Invoke(converter, [value, TValue.From<TDJJSONStream>(context.stream)]);
+  method.Invoke(converter, [value, TValue.From<TDJJSONStream>(context.stream), TValue.From<TDJSettings>(context.settings)]);
 
 end;
 
@@ -1548,7 +1550,7 @@ begin
 
   // get parameter and result types and verify their correctness
   parameters := method.GetParameters;
-  if Length(parameters) <> 1 then
+  if Length(parameters) <> 2 then
   begin
     raise EDJError.Create
       ('Invalid amount of parameters for method "FromJSON" on converter!',
@@ -1572,9 +1574,10 @@ begin
       context.GetPath);
   end;
 
+  // TODO: check type of settings parameter
+
   // invoke the method after everything else seems fine
-  Result := method.Invoke(converter,
-    [TValue.From<TDJJSONStream>(context.stream)]);
+  Result := method.Invoke(converter, [TValue.From<TDJJSONStream>(context.stream), TValue.From<TDJSettings>(context.settings)]);
 
 end;
 

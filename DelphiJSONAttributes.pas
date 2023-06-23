@@ -150,8 +150,8 @@ type
   protected
     function Dummy: Boolean; override; // This allows for RTTI identification
   public
-    procedure ToJSON(value: T; stream: TDJJsonStream); virtual; abstract;
-    function FromJSON(stream: TDJJsonStream): T; virtual; abstract;
+    procedure ToJSON(value: T; stream: TDJJsonStream; settings: TDJSettings); virtual; abstract;
+    function FromJSON(stream: TDJJsonStream; settings: TDJSettings): T; virtual; abstract;
   end;
 
   /// <summary>
