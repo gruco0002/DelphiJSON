@@ -1,5 +1,5 @@
 ///
-/// DelphiJSON Library - Copyright (c) 2021 Corbinian Gruber
+/// DelphiJSON Library - Copyright (c) 2021 - 2023 Corbinian Gruber
 ///
 /// Version: 2.0.0
 ///
@@ -506,7 +506,7 @@ type
 
 implementation
 
-{ TDJJsonStream }
+{TDJJsonStream}
 
 function TDJJsonStream.ReadAsTJsonValue: TJSONValue;
 var
@@ -639,7 +639,7 @@ begin
   end;
 end;
 
-{ TDJSettings }
+{TDJSettings}
 
 constructor TDJSettings.Default;
 begin
@@ -651,7 +651,7 @@ begin
   AllowUnusedJSONFields := true;
 end;
 
-{ EDJError }
+{EDJError}
 
 constructor EDJError.Create(errorMessage: String; path: TArray<String>);
 begin
@@ -688,7 +688,7 @@ begin
   end;
 end;
 
-{ TDJTJsonValueStream }
+{TDJTJsonValueStream}
 
 constructor TDJTJsonValueStream.CreateReader(value: TJSONValue;
   readRootValueOwnedByStream: Boolean);
@@ -1276,7 +1276,7 @@ begin
   self.WriteJsonValue(TJSONString.Create(value), propertyName);
 end;
 
-{ TDJTJsonRWStream }
+{TDJTJsonRWStream}
 
 constructor TDJTJsonRWStream.CreateReader(reader: TJSONReader;
   readerOwnedByThisObject: Boolean);
@@ -1376,9 +1376,9 @@ begin
   end;
   if self.readLastPropertyName = '' then
   begin
-    raise Exception.Create('Cannot read property name in this context!');
+    raise exception.Create('Cannot read property name in this context!');
   end;
-Result :=  self.readLastPropertyName;
+  Result := self.readLastPropertyName;
 end;
 
 procedure TDJTJsonRWStream.ReadStepInto;

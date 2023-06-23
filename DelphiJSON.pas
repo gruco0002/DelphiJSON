@@ -1,5 +1,5 @@
 ///
-/// DelphiJSON Library - Copyright (c) 2021 Corbinian Gruber
+/// DelphiJSON Library - Copyright (c) 2021 - 2023 Corbinian Gruber
 ///
 /// Version: 2.0.0
 ///
@@ -480,6 +480,9 @@ var
   attribute: TCustomAttribute;
   found: Boolean;
 
+  methods: TArray<TRttiMethod>;
+  method: TRttiMethod;
+
   objectFields: TArray<TRttiField>;
   field: TRttiField;
   jsonFieldName: string;
@@ -512,6 +515,21 @@ begin
       raise EDJError.Create
         ('Given object type is missing the JSONSerializable attribute.',
         context.GetPath);
+    end;
+  end;
+
+  // check if this object has a DJToJSONFunctionAttribute
+  methods := dataType.GetMethods;
+  for method in methods do
+  begin
+    for attribute in method.GetAttributes do
+    begin
+      if attribute is DJToJSONFunctionAttribute then
+      begin
+        // serialize the object using this function
+        method.Invoke(value, [context.stream, context.settings]);
+        exit;
+      end;
     end;
   end;
 
@@ -1555,6 +1573,9 @@ type
     converter: IDJConverterInterface;
   end;
 var
+  methods: TArray<TRttiMethod>;
+  tmpMethod: TRttiMethod;
+
   objValue: TValue;
 
   attribute: TCustomAttribute;
@@ -1573,29 +1594,12 @@ var
 
   fieldData: TFieldData;
   fieldDictionary: TDictionary<string, TFieldData>;
+  method: TObject;
 begin
+
   fieldDictionary := nil;
   try
     fieldDictionary := TDictionary<string, TFieldData>.Create;
-
-    if isRecord then
-    begin
-      // create a record value
-      TValue.Make(nil, dataType.Handle, objValue);
-    end
-    else
-    begin
-      // create a new instance of the object
-      objValue := DerConstructObject(dataType, context);
-    end;
-
-    // check if this is a json object
-    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstObject
-    then
-    begin
-      raise EDJError.Create('Expected a JSON Object. ', context.GetPath);
-    end;
-    context.stream.ReadStepInto;
 
     // handle a "standard" object and deserialize it
     allowUnusedFields := context.settings.AllowUnusedJSONFields;
@@ -1623,6 +1627,80 @@ begin
           context.GetPath);
       end;
     end;
+
+    // check if there is a function with a DJFromJSONFunctionAttribute
+    methods := dataType.GetMethods;
+    for tmpMethod in methods do
+    begin
+      for attribute in tmpMethod.GetAttributes do
+      begin
+        if attribute is DJFromJSONFunctionAttribute then
+        begin
+          // we found a DJFromJSONFunctionAttribute, deserialize using the class function
+          if (not tmpMethod.IsClassMethod) or (not tmpMethod.IsStatic) then
+          begin
+            raise EDJError.Create
+              ('Given function marked with DJFromJSONFunctionAttribute is not a static class function. ',
+              context.GetPath);
+          end;
+
+          if tmpMethod.ReturnType.Name <> dataType.Name then
+          begin
+            raise EDJError.Create
+              ('Given function marked with DJFromJSONFunctionAttribute has an invalid return type. ',
+              context.GetPath);
+          end;
+
+          Result := tmpMethod.Invoke(nil, [context.stream, context.settings]);
+          exit;
+        end;
+      end;
+    end;
+
+    // check if the value is null
+    if context.stream.ReadGetType = TDJJSONStream.TDJJsonStreamTypes.djstNull then
+    begin
+      if dataType.Handle^.Kind = TTypeKind.tkClass then
+      begin
+        Result := TValue.From<TObject>(nil);
+        exit;
+      end
+      else if dataType.Handle^.Kind = TTypeKind.tkRecord then
+      begin
+        raise EDJError.Create('Record type can not be null. ', context.GetPath);
+      end
+      else
+      begin
+        raise Exception.Create('Unexpected data type!');
+      end;
+    end;
+
+    // check if the json data provides an object
+    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstObject
+    then
+    begin
+      raise EDJError.Create('Expected a JSON object!', context.GetPath);
+    end;
+
+    // create an empty instance of the object
+    if isRecord then
+    begin
+      // create a record value
+      TValue.Make(nil, dataType.Handle, objValue);
+    end
+    else
+    begin
+      // create a new instance of the object
+      objValue := DerConstructObject(dataType, context);
+    end;
+
+    // check if this is a json object
+    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstObject
+    then
+    begin
+      raise EDJError.Create('Expected a JSON Object. ', context.GetPath);
+    end;
+    context.stream.ReadStepInto;
 
     objectFields := dataType.GetFields;
     for rttifield in objectFields do
@@ -1968,37 +2046,11 @@ begin
   end
   else if dataType.Handle^.Kind = TTypeKind.tkClass then
   begin
-    if context.stream.ReadGetType = TDJJSONStream.TDJJsonStreamTypes.djstNull
-    then
-    begin
-      Result := TValue.From<TObject>(nil);
-    end
-    else if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstObject
-    then
-    begin
-      raise EDJError.Create(typeMismatch, context.GetPath);
-    end
-    else
-    begin
-      Result := DerObject(dataType, context, False);
-    end;
+    Result := DerObject(dataType, context, False);
   end
   else if dataType.Handle^.Kind = TTypeKind.tkRecord then
   begin
-    if context.stream.ReadGetType = TDJJSONStream.TDJJsonStreamTypes.djstNull
-    then
-    begin
-      raise EDJError.Create('Record type can not be null. ', context.GetPath);
-    end;
-
-    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstObject
-    then
-    begin
-      raise EDJError.Create(typeMismatch, context.GetPath);
-    end;
-
     Result := DerObject(dataType, context, true);
-
   end
   else
   begin
@@ -2007,7 +2059,7 @@ begin
   end;
 end;
 
-{ DelphiJSON<T> }
+{DelphiJSON<T>}
 
 constructor DelphiJSON<T>.Create;
 var
@@ -2127,7 +2179,7 @@ begin
   createdSettings.Free;
 end;
 
-{ TSerContext }
+{TSerContext}
 
 procedure TSerContext.AddHeapObject(obj: TObject);
 begin

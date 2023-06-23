@@ -1,5 +1,5 @@
 ///
-/// DelphiJSON Library - Copyright (c) 2021 Corbinian Gruber
+/// DelphiJSON Library - Copyright (c) 2021 - 2023 Corbinian Gruber
 ///
 /// Version: 2.0.0
 ///
@@ -169,6 +169,28 @@ type
     constructor Create(const noUnusedFields: Boolean = true);
   end;
 
+  /// <summary>
+  /// Defines a static/class function of a class or record to be used for
+  /// deserialization instead of using the default deserializer.
+  ///
+  /// The function has to be a static class function with the following signature:
+  /// class function Abc(stream: TDJJsonStream; settings: TDJSettings): TMyType; static;
+  /// Where [Abc] can be an arbitrary function name and [TMyType] has to be
+  /// the type of the corresponding record or class.
+  DJFromJSONFunctionAttribute = class(TCustomAttribute)
+  end;
+
+  /// <summary>
+  /// Defines a regular function of a class or record to be used for
+  /// serialization instead of using the default serializer.
+  ///
+  /// The function has to have the following signature:
+  /// procedure TMyType.Abc(stream: TDJJsonStream; settings: TDJSettings);
+  /// Where [Abc] can be an arbitrary function name and [TMyType] has to be
+  /// the type of the corresponding record or class.
+  DJToJSONFunctionAttribute = class(TCustomAttribute)
+  end;
+
 implementation
 
 type
@@ -176,14 +198,14 @@ type
     abc: integer;
   end;
 
-  { DJValueAttribute }
+  {DJValueAttribute}
 
 constructor DJValueAttribute.Create(const Name: string);
 begin
   self.Name := name;
 end;
 
-{ DJDefaultValueAttribute }
+{DJDefaultValueAttribute}
 
 constructor DJDefaultValueAttribute.Create(const value: single);
 begin
@@ -225,21 +247,21 @@ begin
   Result := true;
 end;
 
-{ DJNoUnusedJSONFieldsAttribute }
+{DJNoUnusedJSONFieldsAttribute}
 
 constructor DJNoUnusedJSONFieldsAttribute.Create(const noUnusedFields: Boolean);
 begin
   self.noUnusedFields := noUnusedFields;
 end;
 
-{ DJRequiredAttribute }
+{DJRequiredAttribute}
 
 constructor DJRequiredAttribute.Create(const required: Boolean);
 begin
   self.required := required;
 end;
 
-{ DJDefaultValueCreatorAttribute<T> }
+{DJDefaultValueCreatorAttribute<T>}
 
 function DJDefaultValueCreatorAttribute<T>.GetValue: T;
 begin
@@ -251,7 +273,7 @@ begin
   Result := False;
 end;
 
-{ DJConverterAttribute<T> }
+{DJConverterAttribute<T>}
 
 function DJConverterAttribute<T>.Dummy: Boolean;
 begin
