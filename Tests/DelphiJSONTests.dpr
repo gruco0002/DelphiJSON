@@ -8,7 +8,7 @@ program DelphiJSONTests;
 {$WARN DUPLICATE_CTOR_DTOR OFF}
 
 uses
-  FastMM4,
+  //FastMM4,
   System.SysUtils,
 {$IFDEF TESTINSIGHT}
   TestInsight.DUnitX,
