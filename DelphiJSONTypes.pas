@@ -623,7 +623,7 @@ begin
   end
   else if value is TJSONString then
   begin
-    self.WriteValueString((value as TJSONString).value);
+    self.WriteValueString((value as TJSONString).value, propertyName);
   end
   else if value is TJSONArray then
   begin

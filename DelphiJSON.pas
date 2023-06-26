@@ -1956,6 +1956,9 @@ begin
       end;
     end;
 
+    // step out of the object
+    context.stream.ReadStepOut;
+
     // return the object
     Result := objValue;
   finally
