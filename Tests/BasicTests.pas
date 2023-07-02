@@ -20,11 +20,21 @@ type
 
     [Test]
     procedure BasicDeserializeTest;
+
+    [Test]
+    procedure SerializeObjectWithinObjectTest;
+
+    [Test]
+    procedure DeserializeObjectWithinObjectTest;
+
+    [Test]
+    procedure DeserializeObjectWithinObjectWithUnusedPropertiesTest;
   end;
 
 implementation
 
-uses DelphiJSON, DelphiJSONAttributes, System.JSON, JSONComparer;
+uses DelphiJSON, DelphiJSONAttributes, System.JSON, JSONComparer,
+  System.SysUtils;
 
 const
   notSerText = 'not (de)serialized';
@@ -53,6 +63,55 @@ type
     constructor CreateJSON;
 
   end;
+
+  [DJSerializable]
+  TTestObj = record
+  public
+
+    [DJValue('data')]
+    data: String;
+
+  end;
+
+  [DJSerializable]
+  TTestObjParent = record
+  public
+
+    [DJValue('tmp')]
+    myValue: Integer;
+
+    [DJValue('child')]
+    child: TTestObj;
+
+  end;
+
+procedure TBasicTests.SerializeObjectWithinObjectTest;
+const
+  res = '{"tmp":-123,"child":{"data":"Hello World"}}';
+var
+  obj: TTestObjParent;
+
+  serialized: TJSONValue;
+  expected: TJSONValue;
+begin
+  serialized := nil;
+  expected := nil;
+  try
+    obj.myValue := -123;
+    obj.child.data := 'Hello World';
+
+    serialized := DelphiJSON<TTestObjParent>.SerializeJ(obj);
+
+    expected := TJSONObject.ParseJSONValue(res);
+
+    Assert.IsTrue(JSONEquals(expected, serialized));
+
+  finally
+    FreeAndNil(serialized);
+    FreeAndNil(expected);
+  end;
+
+end;
 
 procedure TBasicTests.Setup;
 begin
@@ -110,6 +169,30 @@ begin
   obj1.Free;
   obj2.Free;
 
+end;
+
+procedure TBasicTests.DeserializeObjectWithinObjectTest;
+const
+  res = '{"tmp":-123,"child":{"data":"Hello World"}}';
+var
+  deserialized: TTestObjParent;
+begin
+  deserialized := DelphiJSON<TTestObjParent>.Deserialize(res);
+
+  Assert.AreEqual('Hello World', deserialized.child.data);
+  Assert.AreEqual(-123, deserialized.myValue);
+end;
+
+procedure TBasicTests.DeserializeObjectWithinObjectWithUnusedPropertiesTest;
+const
+  res = '{"wow": "this is cool", "child":{"a": true, "data":"Hello World", "test": "test 123", "myValue": 56}, "tmp":-123, "abc": false}';
+var
+  deserialized: TTestObjParent;
+begin
+  deserialized := DelphiJSON<TTestObjParent>.Deserialize(res);
+
+  Assert.AreEqual('Hello World', deserialized.child.data);
+  Assert.AreEqual(-123, deserialized.myValue);
 end;
 
 { TTestClass }
