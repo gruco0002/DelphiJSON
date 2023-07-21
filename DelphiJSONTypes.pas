@@ -199,22 +199,6 @@ type
     procedure WriteValueFloat(const value: double;
       const propertyName: string = ''); virtual; abstract;
 
-  public
-    // helpers for standard conversion from/into TJSONValue
-
-    /// <summary>
-    /// Reads the current active value as TJSONValue and returns it.
-    /// </summary>
-    function ReadAsTJsonValue: TJSONValue;
-
-    /// <summary>
-    /// Writes the json value.
-    /// If propertyName is not empty the json value will be added
-    /// as field with the name propertyName to the current value. If the
-    /// current value is not an object this will cause an exception.
-    /// </summary>
-    procedure WriteTJsonValue(value: TJSONValue;
-      const propertyName: string = '');
   end;
 
   /// <summary>
@@ -371,6 +355,25 @@ type
   // Implementations of TDJJsonStream following
 
   /// <summary>
+  /// Implements helper methods for the TDJJsonStream instances.
+  /// </summary>
+  TDJJsonStreamHelper = class helper for TDJJsonStream
+  public
+    // helpers for standard conversion from/into TJSONValue  /// <summary>
+    /// Reads the current active value as TJSONValue and returns it.
+    /// </summary>
+    function ReadAsTJsonValue: TJSONValue;
+    /// <summary>
+    /// Writes the json value.
+    /// If propertyName is not empty the json value will be added
+    /// as field with the name propertyName to the current value. If the
+    /// current value is not an object this will cause an exception.
+    /// </summary>
+    procedure WriteTJsonValue(value: TJSONValue;
+      const propertyName: string = '');
+  end;
+
+  /// <summary>
   /// Implementation of the TDJJsonStream for TJsonValue based input data.
   /// </summary>
   TDJTJsonValueStream = class(TDJJsonStream)
@@ -469,7 +472,6 @@ type
     function ReadValueString: string; override;
     function ReadValueInteger: Int64; override;
     function ReadValueFloat: double; override;
-
   public
     procedure WriteSetNextPropertyName(const propertyName: string); override;
     procedure WriteBeginObject(const propertyName: string = ''); override;
@@ -485,169 +487,30 @@ type
       const propertyName: string = ''); override;
     procedure WriteValueFloat(const value: double;
       const propertyName: string = ''); override;
-
   public
     constructor CreateReader(reader: TJSONReader;
       readerOwnedByThisObject: Boolean = false);
     constructor CreateWriter(writer: TJSONWriter;
       writerOwnedByThisObject: Boolean = false);
-
     destructor Destroy; override;
-
   private
     isInReadMode: Boolean;
-
     // read related data structures
     readReader: TJSONReader;
     readReaderOwnedByThisObject: Boolean;
     readIterator: TJSONIterator;
     readLastPropertyName: string;
     readIsDoneFlag: Boolean;
-
     // write related data structures
     writeWriter: TJSONWriter;
     writeWriterOwnedByThisObject: Boolean;
     writeNextPropertyName: String;
-
   private
     function WriteGetFinalPropertyName(propertyName: string): string;
     procedure WriteWriteFinalPropertyName(propertyName: string);
   end;
 
 implementation
-
-{TDJJsonStream}
-
-function TDJJsonStream.ReadAsTJsonValue: TJSONValue;
-var
-  t: TDJJsonStreamTypes;
-
-  tmpObject: TJSONObject;
-  tmpArray: TJSONArray;
-
-  tmpPropertyName: string;
-  tmpValue: TJSONValue;
-begin
-  try
-    t := self.ReadGetType;
-
-    case t of
-      djstObject:
-        begin
-          tmpObject := TJSONObject.Create;
-          Result := tmpObject;
-
-          self.ReadStepInto;
-          while not self.ReadIsDone do
-          begin
-            tmpPropertyName := self.ReadPropertyName;
-            tmpValue := self.ReadAsTJsonValue;
-            tmpObject.AddPair(tmpPropertyName, tmpValue);
-            self.ReadNext;
-          end;
-          self.ReadStepOut;
-
-        end;
-      djstArray:
-        begin
-          tmpArray := TJSONArray.Create;
-          Result := tmpArray;
-
-          self.ReadStepInto;
-          while not self.ReadIsDone do
-          begin
-            tmpValue := self.ReadAsTJsonValue;
-            tmpArray.AddElement(tmpValue);
-            self.ReadNext;
-          end;
-          self.ReadStepOut;
-        end;
-      djstNull:
-        begin
-          Result := TJSONNull.Create;
-        end;
-      djstBoolean:
-        begin
-          Result := TJSONBool.Create(self.ReadValueBoolean)
-        end;
-      djstNumberInt:
-        begin
-          Result := TJSONNumber.Create(self.ReadValueInteger);
-        end;
-      djstNumberFloat:
-        begin
-          Result := TJSONNumber.Create(self.ReadValueFloat);
-        end;
-      djstString:
-        begin
-          Result := TJSONString.Create(self.ReadValueString);
-        end;
-    end;
-  except
-    FreeAndNil(Result);
-    raise;
-  end;
-
-end;
-
-procedure TDJJsonStream.WriteTJsonValue(value: TJSONValue;
-  const propertyName: string);
-var
-  tmpArray: TJSONArray;
-  tmpObject: TJSONObject;
-
-  tmpValue: TJSONValue;
-  tmpPropertyName: string;
-  tmpPair: TJSONPair;
-begin
-  if value is TJSONNull then
-  begin
-    self.WriteValueNull(propertyName);
-  end
-  else if value is TJSONBool then
-  begin
-    self.WriteValueBoolean((value as TJSONBool).AsBoolean, propertyName);
-  end
-  else if value is TJSONNumber then
-  begin
-    if value.ToJSON.Contains('.') then
-    begin
-      // float
-      self.WriteValueFloat((value as TJSONNumber).AsDouble, propertyName);
-    end
-    else
-    begin
-      // integer
-      self.WriteValueInteger((value as TJSONNumber).AsInt64, propertyName);
-    end;
-  end
-  else if value is TJSONString then
-  begin
-    self.WriteValueString((value as TJSONString).value, propertyName);
-  end
-  else if value is TJSONArray then
-  begin
-    tmpArray := value as TJSONArray;
-    self.WriteBeginArray(propertyName);
-    for tmpValue in tmpArray do
-    begin
-      self.WriteTJsonValue(tmpValue);
-    end;
-    self.WriteEndArray;
-  end
-  else if value is TJSONObject then
-  begin
-    tmpObject := value as TJSONObject;
-    self.WriteBeginObject(propertyName);
-    for tmpPair in tmpObject do
-    begin
-      tmpValue := tmpPair.JsonValue;
-      tmpPropertyName := tmpPair.JsonString.value;
-      self.WriteTJsonValue(tmpValue, tmpPropertyName);
-    end;
-    self.WriteEndObject;
-  end;
-end;
 
 {TDJSettings}
 
@@ -1594,6 +1457,138 @@ begin
   begin
     self.writeWriter.WritePropertyName(finalPropertyName);
   end;
+end;
+
+{TDJJsonStreamHelper}
+
+function TDJJsonStreamHelper.ReadAsTJsonValue: TJSONValue;
+var
+  t: TDJJsonStreamTypes;
+
+  tmpObject: TJSONObject;
+  tmpArray: TJSONArray;
+
+  tmpPropertyName: string;
+  tmpValue: TJSONValue;
+begin
+  try
+    t := self.ReadGetType;
+
+    case t of
+      djstObject:
+        begin
+          tmpObject := TJSONObject.Create;
+          Result := tmpObject;
+
+          self.ReadStepInto;
+          while not self.ReadIsDone do
+          begin
+            tmpPropertyName := self.ReadPropertyName;
+            tmpValue := self.ReadAsTJsonValue;
+            tmpObject.AddPair(tmpPropertyName, tmpValue);
+            self.ReadNext;
+          end;
+          self.ReadStepOut;
+
+        end;
+      djstArray:
+        begin
+          tmpArray := TJSONArray.Create;
+          Result := tmpArray;
+
+          self.ReadStepInto;
+          while not self.ReadIsDone do
+          begin
+            tmpValue := self.ReadAsTJsonValue;
+            tmpArray.AddElement(tmpValue);
+            self.ReadNext;
+          end;
+          self.ReadStepOut;
+        end;
+      djstNull:
+        begin
+          Result := TJSONNull.Create;
+        end;
+      djstBoolean:
+        begin
+          Result := TJSONBool.Create(self.ReadValueBoolean)
+        end;
+      djstNumberInt:
+        begin
+          Result := TJSONNumber.Create(self.ReadValueInteger);
+        end;
+      djstNumberFloat:
+        begin
+          Result := TJSONNumber.Create(self.ReadValueFloat);
+        end;
+      djstString:
+        begin
+          Result := TJSONString.Create(self.ReadValueString);
+        end;
+    end;
+  except
+    FreeAndNil(Result);
+    raise;
+  end;
+end;
+
+procedure TDJJsonStreamHelper.WriteTJsonValue(value: TJSONValue; const propertyName: string);
+var
+  tmpArray: TJSONArray;
+  tmpObject: TJSONObject;
+
+  tmpValue: TJSONValue;
+  tmpPropertyName: string;
+  tmpPair: TJSONPair;
+begin
+  if value is TJSONNull then
+  begin
+    self.WriteValueNull(propertyName);
+  end
+  else if value is TJSONBool then
+  begin
+    self.WriteValueBoolean((value as TJSONBool).AsBoolean, propertyName);
+  end
+  else if value is TJSONNumber then
+  begin
+    if value.ToJSON.Contains('.') then
+    begin
+      // float
+      self.WriteValueFloat((value as TJSONNumber).AsDouble, propertyName);
+    end
+    else
+    begin
+      // integer
+      self.WriteValueInteger((value as TJSONNumber).AsInt64, propertyName);
+    end;
+  end
+  else if value is TJSONString then
+  begin
+    self.WriteValueString((value as TJSONString).value);
+  end
+  else if value is TJSONArray then
+  begin
+    tmpArray := value as TJSONArray;
+    self.WriteBeginArray(propertyName);
+    for tmpValue in tmpArray do
+    begin
+      self.WriteTJsonValue(tmpValue);
+    end;
+    self.WriteEndArray;
+  end
+  else if value is TJSONObject then
+  begin
+    tmpObject := value as TJSONObject;
+    self.WriteBeginObject(propertyName);
+    for tmpPair in tmpObject do
+    begin
+      tmpValue := tmpPair.JsonValue;
+      tmpPropertyName := tmpPair.JsonString.value;
+      self.WriteTJsonValue(tmpValue, tmpPropertyName);
+    end;
+    self.WriteEndObject;
+  end;
+
 end;
 
 end.
