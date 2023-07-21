@@ -42,6 +42,20 @@ type
     class function Deserialize(data: String; settings: TDJSettings = nil): T;
 
     /// <summary>
+    /// Deserializes the JSON [stream] into the specified object type.
+    /// The given [stream] is not freed by the function, but its contents are
+    /// consumed by this function.
+    /// Optional settings can be given with the [settings] argument.
+    /// If [settings] are given they are not freed by the function.
+    /// If the deserialization causes an error this function will throw this
+    /// error after an internal cleanup to avoid memory leaks.
+    /// Note: always specify the correct type for [T]. Wrong types could lead to
+    /// undefined behaviour.
+    /// </summary>
+    class function DeserializeFromStream(stream: TDJJsonStream;
+      settings: TDJSettings = nil): T;
+
+    /// <summary>
     /// Deserializes the JSON value [data] into the specified object type.
     /// The given value [data] is not freed by the function.
     /// Optional settings can be given with the [settings] argument.
@@ -65,6 +79,21 @@ type
     /// undefined behaviour.
     /// </summary>
     class function Serialize(data: T; settings: TDJSettings = nil): string;
+
+    /// <summary>
+    /// Serializes the given [data] using the provided [stream].
+    /// The [data] is not freed by the function.
+    /// Optional settings can be given with the [settings] argument.
+    /// If [settings] are given they are not freed by the function.
+    /// If the serialization causes an error this function will throw this
+    /// error after an internal cleanup to avoid memory leaks.
+    /// The [stream] object will be altered by the serializer. In case of error
+    /// the [stream] could have undefined contents.
+    /// Note: always specify the correct type for [T]. Wrong types could lead to
+    /// undefined behaviour.
+    /// </summary>
+    class procedure SerializeIntoStream(data: T; stream: TDJJsonStream;
+      settings: TDJSettings = nil);
 
     /// <summary>
     /// Serializes the given [data] into a JSON value.
@@ -103,7 +132,7 @@ type
     RTTI: TRttiContext;
     settings: TDJSettings;
 
-    stream: TDJJSONStream;
+    stream: TDJJsonStream;
 
     constructor Create;
     destructor Destroy; override;
@@ -443,7 +472,7 @@ begin
   // procedure ToJSON(value: T; stream: TDJJsonStream); virtual; abstract;
 
   converterType := context.RTTI.GetType(converter.ClassType);
-  streamType := context.RTTI.GetType(System.TypeInfo(TDJJSONStream));
+  streamType := context.RTTI.GetType(System.TypeInfo(TDJJsonStream));
 
   // get "ToJSON" method from converter
   methods := converterType.GetMethods('ToJSON');
@@ -482,7 +511,7 @@ begin
   // TODO: check type of settings parameter
 
   // invoke the method after everything else seems fine
-  method.Invoke(converter, [value, TValue.From<TDJJSONStream>(context.stream), TValue.From<TDJSettings>(context.settings)]);
+  method.Invoke(converter, [value, TValue.From<TDJJsonStream>(context.stream), TValue.From<TDJSettings>(context.settings)]);
 
 end;
 
@@ -980,7 +1009,7 @@ var
   valueValue: TValue;
   typeValue: TRttiType;
 begin
-  if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstObject
+  if context.stream.ReadGetType <> TDJJsonStream.TDJJsonStreamTypes.djstObject
   then
   begin
     raise EDJError.Create('Expected a JSON object. ', context.GetPath);
@@ -1031,7 +1060,7 @@ var
   propertyName: string;
   i: integer;
 begin
-  if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstArray
+  if context.stream.ReadGetType <> TDJJsonStream.TDJJsonStreamTypes.djstArray
   then
   begin
     raise EDJError.Create('Expected a JSON array. ', context.GetPath);
@@ -1055,7 +1084,7 @@ begin
     context.PushPath(i);
 
     // split up array entry into key and value and check if this went fine
-    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstObject
+    if context.stream.ReadGetType <> TDJJsonStream.TDJJsonStreamTypes.djstObject
     then
     begin
       raise EDJError.Create('Expected a JSON object. ', context.GetPath);
@@ -1133,7 +1162,7 @@ var
   valueKey: TValue;
   valueValue: TValue;
 begin
-  if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstObject
+  if context.stream.ReadGetType <> TDJJsonStream.TDJJsonStreamTypes.djstObject
   then
   begin
     raise EDJError.Create('Expected a JSON object. ', context.GetPath);
@@ -1209,7 +1238,7 @@ var
   i: integer;
   elementValue: TValue;
 begin
-  if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstArray
+  if context.stream.ReadGetType <> TDJJsonStream.TDJJsonStreamTypes.djstArray
   then
   begin
     raise EDJError.Create('Expected a JSON array. ', context.GetPath);
@@ -1260,7 +1289,7 @@ var
   str: string;
   dt: TDateTime;
 begin
-  if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstString
+  if context.stream.ReadGetType <> TDJJsonStream.TDJJsonStreamTypes.djstString
   then
   begin
     raise EDJError.Create
@@ -1291,7 +1320,7 @@ var
   dt: TDate;
   fmt: TFormatSettings;
 begin
-  if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstString
+  if context.stream.ReadGetType <> TDJJsonStream.TDJJsonStreamTypes.djstString
   then
   begin
     raise EDJError.Create('Expected a JSON string in date format.',
@@ -1326,7 +1355,7 @@ var
   dt: TTime;
   fmt: TFormatSettings;
 begin
-  if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstString
+  if context.stream.ReadGetType <> TDJJsonStream.TDJJsonStreamTypes.djstString
   then
   begin
     raise EDJError.Create('Expected a JSON string in time format.',
@@ -1537,7 +1566,7 @@ begin
   // function FromJSON(stream: TDJJsonStream): T; virtual; abstract;
 
   converterType := context.RTTI.GetType(converter.ClassType);
-  streamType := context.RTTI.GetType(System.TypeInfo(TDJJSONStream));
+  streamType := context.RTTI.GetType(System.TypeInfo(TDJJsonStream));
 
   // get "ToJSON" method from converter
   methods := converterType.GetMethods('FromJSON');
@@ -1577,7 +1606,7 @@ begin
   // TODO: check type of settings parameter
 
   // invoke the method after everything else seems fine
-  Result := method.Invoke(converter, [TValue.From<TDJJSONStream>(context.stream), TValue.From<TDJSettings>(context.settings)]);
+  Result := method.Invoke(converter, [TValue.From<TDJJsonStream>(context.stream), TValue.From<TDJSettings>(context.settings)]);
 
 end;
 
@@ -1679,7 +1708,7 @@ begin
     end;
 
     // check if the value is null
-    if context.stream.ReadGetType = TDJJSONStream.TDJJsonStreamTypes.djstNull then
+    if context.stream.ReadGetType = TDJJsonStream.TDJJsonStreamTypes.djstNull then
     begin
       if dataType.Handle^.Kind = TTypeKind.tkClass then
       begin
@@ -1697,7 +1726,7 @@ begin
     end;
 
     // check if the json data provides an object
-    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstObject
+    if context.stream.ReadGetType <> TDJJsonStream.TDJJsonStreamTypes.djstObject
     then
     begin
       raise EDJError.Create('Expected a JSON object!', context.GetPath);
@@ -1716,7 +1745,7 @@ begin
     end;
 
     // check if this is a json object
-    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstObject
+    if context.stream.ReadGetType <> TDJJsonStream.TDJJsonStreamTypes.djstObject
     then
     begin
       raise EDJError.Create('Expected a JSON Object. ', context.GetPath);
@@ -1817,7 +1846,7 @@ begin
       fieldDictionary.Remove(propertyName);
 
       // check if null is a valid json value
-      if context.stream.ReadGetType = TDJJSONStream.TDJJsonStreamTypes.djstNull
+      if context.stream.ReadGetType = TDJJsonStream.TDJJsonStreamTypes.djstNull
       then
       begin
         if not fieldData.nillable then
@@ -1874,7 +1903,7 @@ begin
       end
       else
       begin
-        if context.stream.ReadGetType = TDJJSONStream.TDJJsonStreamTypes.djstNull
+        if context.stream.ReadGetType = TDJJsonStream.TDJJsonStreamTypes.djstNull
         then
         begin
           // field is allowed to be null and is null, hence set it to the empty value
@@ -1979,7 +2008,7 @@ begin
 
   if dataType.Handle^.Kind = TTypeKind.tkArray then
   begin
-    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstArray
+    if context.stream.ReadGetType <> TDJJsonStream.TDJJsonStreamTypes.djstArray
     then
     begin
       raise EDJError.Create(typeMismatch, context.GetPath);
@@ -1988,7 +2017,7 @@ begin
   end
   else if dataType.Handle^.Kind = TTypeKind.tkDynArray then
   begin
-    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstArray
+    if context.stream.ReadGetType <> TDJJsonStream.TDJJsonStreamTypes.djstArray
     then
     begin
       raise EDJError.Create(typeMismatch, context.GetPath);
@@ -1997,7 +2026,7 @@ begin
   end
   else if dataType.Handle = System.TypeInfo(Boolean) then
   begin
-    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstBoolean
+    if context.stream.ReadGetType <> TDJJsonStream.TDJJsonStreamTypes.djstBoolean
     then
     begin
       raise EDJError.Create(typeMismatch, context.GetPath);
@@ -2006,7 +2035,7 @@ begin
   end
   else if dataType.Handle^.Kind = TTypeKind.tkInt64 then
   begin
-    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstNumberInt
+    if context.stream.ReadGetType <> TDJJsonStream.TDJJsonStreamTypes.djstNumberInt
     then
     begin
       raise EDJError.Create(typeMismatch, context.GetPath);
@@ -2015,7 +2044,7 @@ begin
   end
   else if dataType.Handle^.Kind = TTypeKind.tkInteger then
   begin
-    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstNumberInt
+    if context.stream.ReadGetType <> TDJJsonStream.TDJJsonStreamTypes.djstNumberInt
     then
     begin
       raise EDJError.Create(typeMismatch, context.GetPath);
@@ -2025,8 +2054,8 @@ begin
   else if dataType.Handle^.Kind = TTypeKind.tkFloat then
   begin
     if not(context.stream.ReadGetType
-      in [TDJJSONStream.TDJJsonStreamTypes.djstNumberFloat,
-      TDJJSONStream.TDJJsonStreamTypes.djstNumberInt]) then
+      in [TDJJsonStream.TDJJsonStreamTypes.djstNumberFloat,
+      TDJJsonStream.TDJJsonStreamTypes.djstNumberInt]) then
     begin
       raise EDJError.Create(typeMismatch, context.GetPath);
     end;
@@ -2034,7 +2063,7 @@ begin
   end
   else if dataType.Handle^.Kind = TTypeKind.tkString then
   begin
-    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstString
+    if context.stream.ReadGetType <> TDJJsonStream.TDJJsonStreamTypes.djstString
     then
     begin
       raise EDJError.Create(typeMismatch, context.GetPath);
@@ -2043,7 +2072,7 @@ begin
   end
   else if dataType.Handle^.Kind = TTypeKind.tkWString then
   begin
-    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstString
+    if context.stream.ReadGetType <> TDJJsonStream.TDJJsonStreamTypes.djstString
     then
     begin
       raise EDJError.Create(typeMismatch, context.GetPath);
@@ -2052,7 +2081,7 @@ begin
   end
   else if dataType.Handle^.Kind = TTypeKind.tkUString then
   begin
-    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstString
+    if context.stream.ReadGetType <> TDJJsonStream.TDJJsonStreamTypes.djstString
     then
     begin
       raise EDJError.Create(typeMismatch, context.GetPath);
@@ -2061,7 +2090,7 @@ begin
   end
   else if dataType.Handle^.Kind = TTypeKind.tkLString then
   begin
-    if context.stream.ReadGetType <> TDJJSONStream.TDJJsonStreamTypes.djstString
+    if context.stream.ReadGetType <> TDJJsonStream.TDJJsonStreamTypes.djstString
     then
     begin
       raise EDJError.Create(typeMismatch, context.GetPath);
@@ -2098,22 +2127,15 @@ class function DelphiJSON<T>.Deserialize(data: String;
 var
   val: TJSONValue;
 begin
-  val := nil;
+  val := TJSONObject.ParseJSONValue(data, true, true);
   try
-    val := TJSONObject.ParseJSONValue(data, true, true);
     Result := DeserializeJ(val, settings);
-  except
-    on E: EDJError do
-    begin
-      val.Free;
-      raise;
-    end;
+  finally
+    FreeAndNil(val);
   end;
-  val.Free;
 end;
 
-class function DelphiJSON<T>.DeserializeJ(data: TJSONValue;
-  settings: TDJSettings): T;
+class function DelphiJSON<T>.DeserializeFromStream(stream: TDJJsonStream; settings: TDJSettings): T;
 var
   context: TDerContext;
   rttiType: TRttiType;
@@ -2129,7 +2151,7 @@ begin
 
   context := TDerContext.Create;
   context.settings := settings;
-  context.stream := TDJTJsonValueStream.CreateReader(data);
+  context.stream := stream;
 
   try
     rttiType := context.RTTI.GetType(System.TypeInfo(T));
@@ -2147,6 +2169,19 @@ begin
   context.Free;
   createdSettings.Free;
   Result := res.AsType<T>();
+end;
+
+class function DelphiJSON<T>.DeserializeJ(data: TJSONValue;
+  settings: TDJSettings): T;
+var
+  stream: TDJJsonStream;
+begin
+  stream := TDJTJsonValueStream.CreateReader(data, False);
+  try
+    Result := DeserializeFromStream(stream, settings);
+  finally
+    FreeAndNil(stream);
+  end;
 end;
 
 class function DelphiJSON<T>.Serialize(data: T; settings: TDJSettings): string;
@@ -2167,8 +2202,7 @@ begin
   JsonValue.Free;
 end;
 
-class function DelphiJSON<T>.SerializeJ(data: T; settings: TDJSettings)
-  : TJSONValue;
+class procedure DelphiJSON<T>.SerializeIntoStream(data: T; stream: TDJJsonStream; settings: TDJSettings);
 var
   valueObject: TValue;
   context: TSerContext;
@@ -2183,12 +2217,11 @@ begin
 
   context := TSerContext.Create;
   context.settings := settings;
-  context.stream := TDJTJsonValueStream.CreateWriter;
+  context.stream := stream;
 
   try
     valueObject := TValue.From<T>(data);
     SerializeInternal(valueObject, context);
-    Result := (context.stream as TDJTJsonValueStream).ExtractWrittenValue;
   except
     on E: EDJError do
     begin
@@ -2201,6 +2234,20 @@ begin
 
   context.Free;
   createdSettings.Free;
+end;
+
+class function DelphiJSON<T>.SerializeJ(data: T; settings: TDJSettings)
+  : TJSONValue;
+var
+  stream: TDJTJsonValueStream;
+begin
+  stream := TDJTJsonValueStream.CreateWriter;
+  try
+    SerializeIntoStream(data, stream, settings);
+    Result := stream.ExtractWrittenValue;
+  finally
+    FreeAndNil(stream);
+  end;
 end;
 
 {TSerContext}
@@ -2228,7 +2275,6 @@ begin
   self.heapAllocatedObjects := nil;
   self.objectTracker.Free;
   self.objectTracker := nil;
-  self.stream.Free;
 end;
 
 procedure TSerContext.FreeAllHeapObjects;
