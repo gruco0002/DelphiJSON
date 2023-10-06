@@ -515,38 +515,124 @@ begin
 
 end;
 
-procedure SerObject(value: TValue; context: TSerContext; isRecord: Boolean);
+procedure SerObject(value: TValue; context: TSerContext; isRecord: Boolean; isInterface: Boolean);
+type
+  TJsonFieldProperties = record
+    foundDJValueAttribute: Boolean;
+    nillable: Boolean;
+    converter: IDJConverterInterface;
+    nullIfEmptyString: Boolean;
+    jsonFieldName: string;
+    fieldValue: TValue;
+  end;
 var
-  // data: TObject;
-  dataType: TRttiType;
-  attribute: TCustomAttribute;
-  found: Boolean;
+  objectType: TRttiType;
+  objectField: TRttiField;
+  objectProperty: TRttiProperty;
+  objectMethod: TRttiMethod;
 
-  methods: TArray<TRttiMethod>;
-  method: TRttiMethod;
+  jsonFieldProperties: TJsonFieldProperties;
 
-  objectFields: TArray<TRttiField>;
-  field: TRttiField;
-  jsonFieldName: string;
-  fieldValue: TValue;
-
-  nillable: Boolean;
-  converter: IDJConverterInterface;
-
-  nullIfEmptyString: Boolean;
-begin
-
-  dataType := context.RTTI.GetType(value.TypeInfo);
-
-  // TODO: split this function in smaller parts
-
-  // handle a "standard" object and serialize it
-
-  if context.settings.RequireSerializableAttributeForNonRTLClasses then
+  procedure SetJsonFieldPropertiesToDefaults;
   begin
-    // Ensure the object has the serializable attribute. (Fields added later)
+    jsonFieldProperties.foundDJValueAttribute := False;
+    jsonFieldProperties.nillable := true;
+    jsonFieldProperties.converter := nil;
+    jsonFieldProperties.nullIfEmptyString := False;
+    jsonFieldProperties.jsonFieldName := '';
+    jsonFieldProperties.fieldValue := nil;
+  end;
+
+  procedure ObtainJsonFieldPropertiesFromAttributes(obj: TRttiObject);
+  var
+    attribute: TCustomAttribute;
+  begin
+    // check for the attributes
+    for attribute in obj.GetAttributes() do
+    begin
+      if attribute is DJValueAttribute then
+      begin
+        // found the value attribute (this needs to be serialized)
+        jsonFieldProperties.foundDJValueAttribute := true;
+        jsonFieldProperties.jsonFieldName := (attribute as DJValueAttribute).Name.Trim;
+      end
+      else if attribute is DJNonNilableAttribute then
+      begin
+        // nil is not allowed
+        jsonFieldProperties.nillable := False;
+      end
+      else if attribute is IDJConverterInterface then
+      begin
+        jsonFieldProperties.converter := attribute as IDJConverterInterface;
+      end
+      else if attribute is DJNullIfEmptyStringAttribute then
+      begin
+        jsonFieldProperties.nullIfEmptyString := true;
+      end;
+    end;
+
+    // check if nillable is allowed
+    if context.settings.IgnoreNonNillable then
+    begin
+      jsonFieldProperties.nillable := true;
+    end;
+
+    if jsonFieldProperties.foundDJValueAttribute then
+    begin
+      // check if the field name is valid
+      if string.IsNullOrWhiteSpace(jsonFieldProperties.jsonFieldName) then
+      begin
+        raise EDJError.Create('Invalid JSON field name: is null or whitespace. ',
+          context.GetPath);
+      end;
+    end;
+  end;
+
+  procedure SerializeFieldUsingProvidedProperties(fieldType: TRttiType);
+  begin
+    // serialize using properties
+    context.PushPath(jsonFieldProperties.jsonFieldName);
+
+    // check if field is nil
+    if jsonFieldProperties.fieldValue.IsObject then
+    begin
+      if (not jsonFieldProperties.nillable) and (jsonFieldProperties.fieldValue.AsObject = nil) then
+      begin
+        raise EDJNilError.Create('Field value must not be nil, but was nil. ',
+          context.GetPath);
+      end;
+    end;
+
+    // serialize
+    context.stream.WriteSetNextPropertyName(jsonFieldProperties.jsonFieldName);
+    if jsonFieldProperties.converter <> nil then
+    begin
+      // use the converter
+      SerUsingConverter(jsonFieldProperties.fieldValue, fieldType, jsonFieldProperties.converter, context);
+    end
+    else
+    begin
+      if jsonFieldProperties.fieldValue.IsObject and (jsonFieldProperties.fieldValue.AsObject = nil) then
+      begin
+        // field is nil and allowed to be nil, hence return a json null
+        context.stream.WriteValueNull();
+      end
+      else
+      begin
+        // use the default serialization
+        SerializeInternal(jsonFieldProperties.fieldValue, context, jsonFieldProperties.nullIfEmptyString);
+      end;
+    end;
+    context.PopPath;
+  end;
+
+  procedure EnsureDJSerializableAttributePresent;
+  var
+    found: Boolean;
+    attribute: TCustomAttribute;
+  begin
     found := False;
-    for attribute in dataType.GetAttributes() do
+    for attribute in objectType.GetAttributes() do
     begin
       if attribute is DJSerializableAttribute then
       begin
@@ -562,119 +648,168 @@ begin
     end;
   end;
 
-  // check if this object has a DJToJSONFunctionAttribute
-  methods := dataType.GetMethods;
-  for method in methods do
+  function CheckIfToJsonAttributeIsPresent: Boolean;
+  var
+    methods: TArray<TRttiMethod>;
+    method: TRttiMethod;
+    attribute: TCustomAttribute;
   begin
-    for attribute in method.GetAttributes do
+    Result := False;
+    methods := objectType.GetMethods;
+    for method in methods do
     begin
-      if attribute is DJToJSONFunctionAttribute then
+      for attribute in method.GetAttributes do
       begin
-        // serialize the object using this function
-        method.Invoke(value, [context.stream, context.settings]);
-        exit;
+        if attribute is DJToJSONFunctionAttribute then
+        begin
+          // serialize the object using this function
+          Result := true;
+          method.Invoke(value, [context.stream, context.settings]);
+          exit;
+        end;
       end;
     end;
+  end;
+
+begin
+  // handle a "standard" object and serialize it
+
+  // obtain the objects type
+  objectType := context.RTTI.GetType(value.TypeInfo);
+
+  // check for DJSerializable requirement
+  if context.settings.RequireSerializableAttributeForNonRTLClasses then
+  begin
+    // Ensure the object has the serializable attribute.
+    EnsureDJSerializableAttributePresent;
+  end;
+
+  // check if this object has a DJToJSONFunctionAttribute
+  if CheckIfToJsonAttributeIsPresent then
+  begin
+    exit;
   end;
 
   // Init the result object
   context.stream.WriteBeginObject();
 
-  // adding fields to the object
-  objectFields := dataType.GetFields;
-  for field in objectFields do
+  // serialize object fields that are annotated
+  for objectField in objectType.GetFields do
   begin
     // default values for properties
-    found := False;
-    nillable := true;
-    converter := nil;
-    nullIfEmptyString := False;
+    SetJsonFieldPropertiesToDefaults;
 
-    // check for the attributes
-    for attribute in field.GetAttributes() do
-    begin
-      if attribute is DJValueAttribute then
-      begin
-        // found the value attribute (this needs to be serialized)
-        found := true;
-        jsonFieldName := (attribute as DJValueAttribute).Name.Trim;
-      end
-      else if attribute is DJNonNilableAttribute then
-      begin
-        // nil is not allowed
-        nillable := False;
-      end
-      else if attribute is IDJConverterInterface then
-      begin
-        converter := attribute as IDJConverterInterface;
-      end
-      else if attribute is DJNullIfEmptyStringAttribute then
-      begin
-        nullIfEmptyString := true;
-      end;
-    end;
+    // obtain all properties
+    ObtainJsonFieldPropertiesFromAttributes(objectField);
 
-    // check if nillable is allowed
-    if context.settings.IgnoreNonNillable then
-    begin
-      nillable := true;
-    end;
-
-    if not found then
+    if not jsonFieldProperties.foundDJValueAttribute then
     begin
       // skip this field since it is not opted-in for serialization
       continue;
     end;
 
-    // check if the field name is valid
-    if string.IsNullOrWhiteSpace(jsonFieldName) then
-    begin
-      raise EDJError.Create('Invalid JSON field name: is null or whitespace. ',
-        context.GetPath);
-    end;
-
+    // obtain value of the field
     if isRecord then
     begin
-      fieldValue := field.GetValue(value.GetReferenceToRawData);
+      jsonFieldProperties.fieldValue := objectField.GetValue(value.GetReferenceToRawData);
     end
     else
     begin
-      fieldValue := field.GetValue(value.AsObject);
-    end;
-
-    context.PushPath(jsonFieldName);
-
-    // check if field is nil
-    if fieldValue.IsObject then
-    begin
-      if (not nillable) and (fieldValue.AsObject = nil) then
-      begin
-        raise EDJNilError.Create('Field value must not be nil, but was nil. ',
-          context.GetPath);
-      end;
+      // the object is a class, since interfaces do not have fields
+      jsonFieldProperties.fieldValue := objectField.GetValue(value.AsObject);
     end;
 
     // serialize
-    context.stream.WriteSetNextPropertyName(jsonFieldName);
-    if converter <> nil then
+    SerializeFieldUsingProvidedProperties(objectField.fieldType);
+  end;
+
+  // serialize object properties that are annotated
+  for objectProperty in objectType.GetProperties do
+  begin
+    // FIXME: There are no properties availabe using RTTI for interfaces, despite the
+    // documentation at https://docwiki.embarcadero.com/Libraries/Sydney/en/System.Rtti.TRttiType.GetProperties
+    // claiming that there should be!
+
+    if not objectProperty.IsReadable then
     begin
-      // use the converter
-      SerUsingConverter(fieldValue, field.FieldType, converter, context);
+      // we can only process readable properties
+      continue;
+    end;
+
+    // default values for properties
+    SetJsonFieldPropertiesToDefaults;
+
+    // obtain all properties
+    ObtainJsonFieldPropertiesFromAttributes(objectProperty);
+
+    if not jsonFieldProperties.foundDJValueAttribute then
+    begin
+      // skip this property since it is not opted-in for serialization
+      continue;
+    end;
+
+    // obtain value of the property
+    if isRecord then
+    begin
+      jsonFieldProperties.fieldValue := objectProperty.GetValue(value.GetReferenceToRawData);
+    end
+    else if isInterface then
+    begin
+      jsonFieldProperties.fieldValue := objectProperty.GetValue(value.AsInterface);
     end
     else
     begin
-      if fieldValue.IsObject and (fieldValue.AsObject = nil) then
-      begin
-        // field is nil and allowed to be nil, hence return a json null
-        context.stream.WriteValueNull();
-      end
-      else
-      begin
-        // use the default serialization
-        SerializeInternal(fieldValue, context, nullIfEmptyString);
-      end;
+      jsonFieldProperties.fieldValue := objectProperty.GetValue(value.AsObject);
     end;
-    context.PopPath;
+
+    // serialize
+    SerializeFieldUsingProvidedProperties(objectField.fieldType);
+  end;
+
+  // serialize getter methods if annotated
+  for objectMethod in objectType.GetMethods do
+  begin
+    if objectMethod.MethodKind <> TMethodKind.mkFunction then
+    begin
+      // only support functions
+      continue;
+    end;
+
+    if Length(objectMethod.GetParameters) <> 0 then
+    begin
+      // only support getter methods
+      continue;
+    end;
+
+    // default values for properties
+    SetJsonFieldPropertiesToDefaults;
+
+    // obtain all properties
+    ObtainJsonFieldPropertiesFromAttributes(objectMethod);
+
+    if not jsonFieldProperties.foundDJValueAttribute then
+    begin
+      // skip this property since it is not opted-in for serialization
+      continue;
+    end;
+
+    // obtain value of the property
+    if isRecord then
+    begin
+      jsonFieldProperties.fieldValue := objectMethod.Invoke(value.GetReferenceToRawData, []);
+    end
+    else if isInterface then
+    begin
+      jsonFieldProperties.fieldValue := objectMethod.Invoke(value, []);
+    end
+    else
+    begin
+      jsonFieldProperties.fieldValue := objectMethod.Invoke(value.AsObject, []);
+    end;
+
+    // serialize
+    SerializeFieldUsingProvidedProperties(objectMethod.ReturnType);
+
   end;
 
   context.stream.WriteEndObject;
@@ -737,11 +872,15 @@ begin
   end
   else if value.IsObject then
   begin
-    SerObject(value, context, False);
+    SerObject(value, context, False, False);
   end
   else if value.Kind = TTypeKind.tkRecord then
   begin
-    SerObject(value, context, true);
+    SerObject(value, context, true, False);
+  end
+  else if value.Kind = TTypeKind.tkInterface then
+  begin
+    SerObject(value, context, False, true);
   end
   else
   begin
@@ -1187,7 +1326,7 @@ begin
 
       // deserialize key
       context.PushPath('key');
-      typeKey := dataType.GetField('Key').FieldType;
+      typeKey := dataType.GetField('Key').fieldType;
       valueKey := DeserializeInternal(typeKey, context);
       context.PopPath;
     end
@@ -1196,7 +1335,7 @@ begin
       foundValue := true;
 
       // deserialize value
-      typeValue := dataType.GetField('Value').FieldType;
+      typeValue := dataType.GetField('Value').fieldType;
       context.PushPath('value');
       valueValue := DeserializeInternal(typeValue, context);
       context.PopPath;
@@ -1862,7 +2001,7 @@ begin
           begin
             // a default value is defined, use it
             context.PushPath(propertyName);
-            fieldValue := DerGetDefaultValue(fieldData.field.FieldType, context,
+            fieldValue := DerGetDefaultValue(fieldData.field.fieldType, context,
               fieldData.defaultValue);
             if fieldValue.IsObject then
             begin
@@ -1898,7 +2037,7 @@ begin
       if fieldData.converter <> nil then
       begin
         // converter deserialization
-        fieldValue := DerUsingConverter(fieldData.field.FieldType, context,
+        fieldValue := DerUsingConverter(fieldData.field.fieldType, context,
           fieldData.converter);
       end
       else
@@ -1912,7 +2051,7 @@ begin
         else
         begin
           // default deserialization
-          fieldValue := DeserializeInternal(fieldData.field.FieldType, context);
+          fieldValue := DeserializeInternal(fieldData.field.fieldType, context);
         end;
       end;
       context.PopPath;
@@ -1949,7 +2088,7 @@ begin
         begin
           // a default value is defined, use it
           context.PushPath(fieldData.jsonFieldName);
-          fieldValue := DerGetDefaultValue(fieldData.field.FieldType, context,
+          fieldValue := DerGetDefaultValue(fieldData.field.fieldType, context,
             fieldData.defaultValue);
           if fieldValue.IsObject then
           begin
