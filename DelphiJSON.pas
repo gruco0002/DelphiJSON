@@ -878,6 +878,10 @@ begin
   begin
     SerObject(value, context, true, False);
   end
+  else if value.Kind = TTypeKind.tkMRecord then
+  begin
+    SerObject(value, context, true, False);
+  end
   else if value.Kind = TTypeKind.tkInterface then
   begin
     SerObject(value, context, False, true);
