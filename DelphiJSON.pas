@@ -763,7 +763,7 @@ begin
     end;
 
     // serialize
-    SerializeFieldUsingProvidedProperties(objectField.fieldType);
+    SerializeFieldUsingProvidedProperties(objectProperty.PropertyType);
   end;
 
   // serialize getter methods if annotated
