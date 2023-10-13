@@ -630,16 +630,39 @@ var
   var
     found: Boolean;
     attribute: TCustomAttribute;
+    BaseType: TRttiType;
   begin
     found := False;
-    for attribute in objectType.GetAttributes() do
+    while not found do
     begin
-      if attribute is DJSerializableAttribute then
+      // check for the presence of the DJSerializableAttribute
+      for attribute in objectType.GetAttributes() do
       begin
-        found := true;
+        if attribute is DJSerializableAttribute then
+        begin
+          found := true;
+          break;
+        end;
+      end;
+      if found then
+      begin
         break;
       end;
+
+      // check the base type of this object if available, this means that only the base type fields are serialized
+      BaseType := objectType.BaseType;
+      if BaseType = nil then
+      begin
+        break;
+      end;
+      if objectType.Equals(BaseType) then
+      begin
+        break;
+      end;
+      objectType := BaseType;
     end;
+
+    // if no DJSerializableAttribute is found raise an error
     if not found then
     begin
       raise EDJError.Create
