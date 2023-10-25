@@ -612,7 +612,7 @@ var
     end
     else
     begin
-      if jsonFieldProperties.fieldValue.IsObject and (jsonFieldProperties.fieldValue.AsObject = nil) then
+      if jsonFieldProperties.fieldValue.IsObject and (jsonFieldProperties.fieldValue.AsObject = nil) and (not jsonFieldProperties.fieldValue.IsArray) then
       begin
         // field is nil and allowed to be nil, hence return a json null
         context.stream.WriteValueNull();
