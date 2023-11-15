@@ -199,6 +199,14 @@ type
   DJNullIfEmptyStringAttribute = class(TCustomAttribute)
   end;
 
+  /// <summary>
+  /// If applied to a field the [DJIgnoreFieldIfNil] is active during
+  /// serialization and causes a field to not be serialized if its value
+  /// is nil.
+  /// </summary>
+  DJIgnoreFieldIfNil = class(TCustomAttribute)
+  end;
+
 implementation
 
 type

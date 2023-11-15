@@ -523,6 +523,7 @@ type
     converter: IDJConverterInterface;
     nullIfEmptyString: Boolean;
     jsonFieldName: string;
+    ignoreFieldIfNil: Boolean;
     fieldValue: TValue;
   end;
 var
@@ -541,6 +542,7 @@ var
     jsonFieldProperties.nullIfEmptyString := False;
     jsonFieldProperties.jsonFieldName := '';
     jsonFieldProperties.fieldValue := nil;
+    jsonFieldProperties.ignoreFieldIfNil := False;
   end;
 
   procedure ObtainJsonFieldPropertiesFromAttributes(obj: TRttiObject);
@@ -568,6 +570,10 @@ var
       else if attribute is DJNullIfEmptyStringAttribute then
       begin
         jsonFieldProperties.nullIfEmptyString := true;
+      end
+      else if attribute is DJIgnoreFieldIfNil then
+      begin
+        jsonFieldProperties.ignoreFieldIfNil := true;
       end;
     end;
 
@@ -600,6 +606,11 @@ var
       begin
         raise EDJNilError.Create('Field value must not be nil, but was nil. ',
           context.GetPath);
+      end
+      else if jsonFieldProperties.ignoreFieldIfNil and (jsonFieldProperties.fieldValue.AsObject = nil) then
+      begin
+        // the field is nil and is marked to be ignored in this case
+        exit;
       end;
     end;
 
