@@ -28,7 +28,7 @@ type
 implementation
 
 uses
-  DelphiJSON, DelphiJSONAttributes, DelphiJSONTypes, System.SysUtils, System.JSON, JSONComparer;
+  DelphiJSON, DelphiJSONTypes, System.SysUtils, System.JSON, JSONComparer;
 
 type
 

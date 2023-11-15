@@ -3,7 +3,7 @@ unit RequiredTests;
 interface
 
 uses
-  DUnitX.TestFramework, DelphiJSONAttributes;
+  DUnitX.TestFramework, DelphiJSON;
 
 type
 
@@ -57,9 +57,9 @@ type
 implementation
 
 uses
-  JSONComparer, System.JSON, DelphiJSON, DelphiJSONTypes;
+  JSONComparer, System.JSON, DelphiJSONTypes;
 
-{ TRequiredTests }
+{TRequiredTests}
 
 procedure TRequiredTests.TestRequiredAttrDes;
 const

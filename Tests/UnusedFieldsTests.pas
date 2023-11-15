@@ -3,7 +3,7 @@ unit UnusedFieldsTests;
 interface
 
 uses
-  DUnitX.TestFramework, DelphiJSONAttributes;
+  DUnitX.TestFramework, DelphiJSON;
 
 type
 
@@ -51,9 +51,9 @@ type
 implementation
 
 uses
-  DelphiJSON, DelphiJSONTypes;
+  DelphiJSONTypes;
 
-{ TUnusedFieldsTests }
+{TUnusedFieldsTests}
 
 procedure TUnusedFieldsTests.TestAttribute;
 const

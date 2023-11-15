@@ -3,7 +3,7 @@ unit ErrorTests;
 interface
 
 uses
-  DUnitX.TestFramework, DelphiJSONAttributes, System.Generics.Collections;
+  DUnitX.TestFramework, DelphiJSON, System.Generics.Collections;
 
 type
 
@@ -34,9 +34,9 @@ type
 implementation
 
 uses
-  DelphiJSON, DelphiJSONTypes;
+  DelphiJSONTypes;
 
-{ TErrorTests }
+{TErrorTests}
 
 procedure TErrorTests.TestPath1;
 const

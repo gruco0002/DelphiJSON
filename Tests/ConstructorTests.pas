@@ -3,7 +3,7 @@ unit ConstructorTests;
 interface
 
 uses
-  DUnitX.TestFramework, DelphiJSONAttributes;
+  DUnitX.TestFramework, DelphiJSON;
 
 type
 
@@ -62,10 +62,8 @@ type
 
 implementation
 
-uses
-  DelphiJSON;
 
-{ TConstr1 }
+{TConstr1}
 
 constructor TConstr1.Create;
 begin
@@ -77,7 +75,7 @@ begin
   // Assert.Pass();
 end;
 
-{ TConstructorTests }
+{TConstructorTests}
 
 procedure TConstructorTests.TestAnnotatedConstructor1;
 const
@@ -114,7 +112,7 @@ begin
 
 end;
 
-{ TConstr2 }
+{TConstr2}
 
 constructor TConstr2.Create;
 begin
@@ -126,7 +124,7 @@ begin
   Assert.Fail();
 end;
 
-{ TConstr3 }
+{TConstr3}
 
 constructor TConstr3.Create;
 begin

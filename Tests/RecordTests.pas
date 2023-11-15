@@ -22,8 +22,7 @@ type
 implementation
 
 uses
-  DelphiJSONAttributes, DelphiJSON, System.JSON, JSONComparer, System.DateUtils,
-  System.SysUtils;
+  DelphiJSON, System.JSON, JSONComparer, System.DateUtils, System.SysUtils;
 
 type
 
@@ -43,7 +42,7 @@ type
     dt: TDateTime;
   end;
 
-  { TRecordTests }
+  {TRecordTests}
 
 procedure TRecordTests.DeserializeTest;
 const

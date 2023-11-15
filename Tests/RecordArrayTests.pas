@@ -3,7 +3,7 @@ unit RecordArrayTests;
 interface
 
 uses
-  DUnitX.TestFramework, DelphiJSONAttributes;
+  DUnitX.TestFramework, DelphiJSON;
 
 type
 
@@ -29,9 +29,9 @@ type
 implementation
 
 uses
-  System.JSON, JSONComparer, DelphiJSON;
+  System.JSON, JSONComparer;
 
-{ TRecordArrayTests }
+{TRecordArrayTests}
 
 procedure TRecordArrayTests.TestRecordDynArrayDer;
 const

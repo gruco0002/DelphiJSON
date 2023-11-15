@@ -3,7 +3,7 @@ unit ConverterTests;
 interface
 
 uses
-  DUnitX.TestFramework, DelphiJSONAttributes, DelphiJSONTypes;
+  DUnitX.TestFramework, DelphiJSON, DelphiJSONTypes;
 
 type
   TUpperConv = class(DJConverterAttribute<String>)
@@ -36,7 +36,7 @@ type
 implementation
 
 uses
-  System.SysUtils, System.StrUtils, JSONComparer, DelphiJSON, System.JSON;
+  System.SysUtils, System.StrUtils, JSONComparer, System.JSON;
 
 {TUpperConv}
 

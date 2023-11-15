@@ -33,8 +33,8 @@ type
 
 implementation
 
-uses DelphiJSON, DelphiJSONAttributes, System.JSON, JSONComparer,
-  System.SysUtils;
+uses
+  DelphiJSON, System.JSON, JSONComparer, System.SysUtils;
 
 const
   notSerText = 'not (de)serialized';
@@ -195,7 +195,7 @@ begin
   Assert.AreEqual(-123, deserialized.myValue);
 end;
 
-{ TTestClass }
+{TTestClass}
 
 constructor TTestClass.Create;
 begin

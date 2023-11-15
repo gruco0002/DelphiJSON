@@ -32,8 +32,7 @@ type
 implementation
 
 uses
-  JSONComparer, DelphiJSON, DelphiJSONAttributes, System.JSON,
-  System.Generics.Collections;
+  JSONComparer, DelphiJSON, System.JSON, System.Generics.Collections;
 
 type
 

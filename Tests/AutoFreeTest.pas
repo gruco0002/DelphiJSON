@@ -3,7 +3,7 @@ unit AutoFreeTest;
 interface
 
 uses
-  DUnitX.TestFramework, DelphiJSONAttributes;
+  DUnitX.TestFramework, DelphiJSON;
 
 type
 
@@ -31,9 +31,9 @@ type
 implementation
 
 uses
-  DelphiJSON, DelphiJSONTypes;
+  DelphiJSONTypes;
 
-{ TTest }
+{TTest}
 
 destructor TTest.Destroy;
 begin
@@ -41,7 +41,7 @@ begin
   inherited;
 end;
 
-{ TAutoFreeTest }
+{TAutoFreeTest}
 
 procedure TAutoFreeTest.TestAutoFree;
 const

@@ -3,7 +3,7 @@ unit DefaultValueTests;
 interface
 
 uses
-  DUnitX.TestFramework, DelphiJSONAttributes, System.Generics.Collections;
+  DUnitX.TestFramework, DelphiJSON, System.Generics.Collections;
 
 type
 
@@ -77,8 +77,6 @@ type
 
 implementation
 
-uses
-  DelphiJSON;
 
 function Generator: TObject;
 begin
@@ -86,7 +84,7 @@ begin
   (Result as TList<String>).Add('Wow');
 end;
 
-{ TDefaultValueTests }
+{TDefaultValueTests}
 
 procedure TDefaultValueTests.Test1;
 const
@@ -191,7 +189,7 @@ begin
   tmp.Free;
 end;
 
-{ TEmptyListGenerator }
+{TEmptyListGenerator}
 
 function TCustomListGenerator.Generator: TList<String>;
 begin

@@ -3,7 +3,7 @@ unit NonNilableTests;
 interface
 
 uses
-  DUnitX.TestFramework, DelphiJSONAttributes, System.Generics.Collections;
+  DUnitX.TestFramework, DelphiJSON, System.Generics.Collections;
 
 type
 
@@ -37,9 +37,9 @@ type
 implementation
 
 uses
-  System.JSON, JsonComparer, DelphiJSON, DelphiJSONTypes;
+  System.JSON, JsonComparer, DelphiJSONTypes;
 
-{ TNonNilableTests }
+{TNonNilableTests}
 
 procedure TNonNilableTests.TestDeserialization;
 const
