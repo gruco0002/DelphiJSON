@@ -27,7 +27,7 @@ type
 implementation
 
 uses
-  System.JSON, JSONComparer, DelphiJSON, DelphiJSONTypes;
+  System.JSON, JSONComparer, DelphiJSON;
 
 { TArrayTests }
 

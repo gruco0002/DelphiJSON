@@ -57,7 +57,7 @@ type
 implementation
 
 uses
-  JSONComparer, System.JSON, DelphiJSONTypes;
+  JSONComparer, System.JSON;
 
 {TRequiredTests}
 

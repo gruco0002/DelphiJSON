@@ -22,7 +22,7 @@ type
 implementation
 
 uses
-  DelphiJSON, DelphiJSONTypes, System.SysUtils, System.JSON, JSONComparer;
+  DelphiJSON, System.SysUtils, System.JSON, JSONComparer;
 
 type
 

@@ -37,7 +37,7 @@ type
 implementation
 
 uses
-  System.JSON, JsonComparer, DelphiJSONTypes;
+  System.JSON, JsonComparer;
 
 {TNonNilableTests}
 

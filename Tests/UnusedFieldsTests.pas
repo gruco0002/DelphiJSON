@@ -50,9 +50,6 @@ type
 
 implementation
 
-uses
-  DelphiJSONTypes;
-
 {TUnusedFieldsTests}
 
 procedure TUnusedFieldsTests.TestAttribute;

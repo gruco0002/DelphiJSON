@@ -34,8 +34,6 @@ type
 
 implementation
 
-uses
-  DelphiJSONTypes;
 
 {TCycleTests}
 

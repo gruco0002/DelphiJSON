@@ -33,9 +33,6 @@ type
 
 implementation
 
-uses
-  DelphiJSONTypes;
-
 {TErrorTests}
 
 procedure TErrorTests.TestPath1;

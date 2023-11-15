@@ -34,8 +34,7 @@ type
 implementation
 
 uses
-  System.JSON, JSONComparer, DelphiJSON, System.Generics.Collections,
-  DelphiJSONTypes;
+  System.JSON, JSONComparer, DelphiJSON, System.Generics.Collections;
 
 { TDictionaryTests }
 

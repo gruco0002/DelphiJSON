@@ -35,7 +35,7 @@ type
 implementation
 
 uses
-  System.JSON, JSONComparer, DelphiJSONTypes;
+  System.JSON, JSONComparer;
 
 {TSerializableAttrTests}
 
