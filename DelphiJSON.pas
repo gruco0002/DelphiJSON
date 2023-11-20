@@ -284,7 +284,21 @@ type
   /// class function Abc(stream: TDJJsonStream; settings: TDJSettings): TMyType; static;
   /// Where [Abc] can be an arbitrary function name and [TMyType] has to be
   /// the type of the corresponding record or class.
+  ///
+  /// If [doNotInherit] is set to true (the default value), class instances
+  /// that inherit from the class that defines the function, will not cause
+  /// the deserializer to call this function. For instance:
+  /// DelphiJSON<TBase>.Deserialize(...) -> will call the function
+  /// DelphiJSON<TInheritsBase>.Deserialize(...) -> will not call the function.
+  /// The same holds for field definitions:
+  /// abc: TBase; -> will call the function
+  /// abc: TInheritsBase -> will not call the function
+  /// If [doNotInherit] is set to false, all types that inherit from this
+  /// class will use the annotated function for deserializing.
   DJFromJSONFunctionAttribute = class(TCustomAttribute)
+  public
+    doNotInherit: Boolean;
+    constructor Create(const doNotInherit: Boolean = true);
   end;
 
   /// <summary>
@@ -2591,15 +2605,34 @@ begin
               context.GetPath);
           end;
 
-          if tmpMethod.ReturnType.Name <> dataType.Name then
+          // check that the return type matches the current data type
+          if tmpMethod.ReturnType.Name <> tmpMethod.Parent.Name then
           begin
             raise EDJError.Create
-              ('Given function marked with DJFromJSONFunctionAttribute has an invalid return type. ',
+              ('Given function marked with DJFromJSONFunctionAttribute has an invalid return type. Expected "' +
+              tmpMethod.Parent.Name + '" but got "' + tmpMethod.ReturnType.Name + '". ',
               context.GetPath);
           end;
 
-          Result := tmpMethod.Invoke(nil, [context.stream, context.settings]);
-          exit;
+          var
+            allowUsageOfAnnotatedFunction: Boolean := true;
+
+          if (attribute as DJFromJSONFunctionAttribute).doNotInherit then
+          begin
+            if dataType.Name <> tmpMethod.Parent.Name then
+            begin
+              // the current data type does not match the type which defines the function
+              // and since doNotInherit is set to true, we do not want to use the
+              // annotated function in this case
+              allowUsageOfAnnotatedFunction := false;
+            end;
+          end;
+
+          if allowUsageOfAnnotatedFunction then
+          begin
+            Result := tmpMethod.Invoke(nil, [context.stream, context.settings]);
+            exit;
+          end;
         end;
       end;
     end;
@@ -3329,6 +3362,14 @@ end;
 {$ENDREGION}
 
 {$REGION 'Attributes Implementation'}
+
+{DJFromJSONFunctionAttribute}
+
+constructor DJFromJSONFunctionAttribute.Create(const doNotInherit: Boolean);
+begin
+  inherited Create;
+  self.doNotInherit := doNotInherit;
+end;
 
 {DJValueAttribute}
 
