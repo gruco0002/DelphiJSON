@@ -16,8 +16,6 @@ uses
   DUnitX.Loggers.Xml.NUnit,
   DUnitX.TestFramework,
   DelphiJSON in '..\DelphiJSON.pas',
-  DelphiJSONAttributes in '..\DelphiJSONAttributes.pas',
-  DelphiJSONTypes in '..\DelphiJSONTypes.pas',
   BasicTests in 'BasicTests.pas',
   JSONComparer in 'JSONComparer.pas',
   JSONComparerTests in 'JSONComparerTests.pas',

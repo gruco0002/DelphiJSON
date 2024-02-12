@@ -31,8 +31,6 @@ requires
   rtl;
 
 contains
-  DelphiJSON in 'DelphiJSON.pas',
-  DelphiJSONAttributes in 'DelphiJSONAttributes.pas',
-  DelphiJSONTypes in 'DelphiJSONTypes.pas';
+  DelphiJSON in 'DelphiJSON.pas';
 
 end.

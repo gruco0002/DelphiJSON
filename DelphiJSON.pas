@@ -2645,7 +2645,7 @@ begin
         Result := TValue.From<TObject>(nil);
         exit;
       end
-      else if dataType.Handle^.Kind = TTypeKind.tkRecord then
+      else if (dataType.Handle^.Kind = TTypeKind.tkRecord) or (dataType.Handle^.Kind = TTypeKind.tkMRecord) then
       begin
         raise EDJError.Create('Record type can not be null. ', context.GetPath);
       end
@@ -3031,7 +3031,7 @@ begin
   begin
     Result := DerObject(dataType, context, false);
   end
-  else if dataType.Handle^.Kind = TTypeKind.tkRecord then
+  else if (dataType.Handle^.Kind = TTypeKind.tkRecord) or (dataType.Handle^.Kind = TTypeKind.tkMRecord) then
   begin
     Result := DerObject(dataType, context, true);
   end
